@@ -17,3 +17,9 @@ model Obra {
   estado      String
   createdAt   DateTime @default(now())
 }
+model Cliente {
+  id       Int     @id @default(autoincrement())
+  nombre   String
+  email    String
+  telefono String
+}

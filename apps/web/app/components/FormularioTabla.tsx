@@ -1,12 +1,14 @@
 'use client';
 
 import React from 'react';
+import styles from './FormularioTabla.module.css';
 
 type Campo = {
   nombre: string;
   etiqueta: string;
   tipo?: string;
   placeholder?: string;
+  opciones?: { value: string; label: string }[];
 };
 
 type Props = {
@@ -29,23 +31,50 @@ const FormularioTabla: React.FC<Props> = ({
   soloLectura = false,
 }) => {
   return (
-    <div style={{ padding: '1rem', maxWidth: '600px' }}>
-      {titulo && <h2>{titulo}</h2>}
-      <table>
+    <div className={styles.formWrapper}>
+      {titulo && <h2 className={styles.titulo}>{titulo}</h2>}
+      <table className={styles.formularioTabla}>
         <tbody>
           {campos.map((campo) => (
             <tr key={campo.nombre}>
-              <td style={{ padding: '8px', fontWeight: 'bold' }}>{campo.etiqueta}</td>
-              <td style={{ padding: '8px' }}>
+              <td className={styles.etiqueta}>{campo.etiqueta}</td>
+              <td className={styles.campo}>
                 {soloLectura ? (
-                  <span>{valores[campo.nombre] || '-'}</span>
-                ) : (
-                  <input
-                    type={campo.tipo || 'text'}
+                  <span>{valores[campo.nombre]?.toString() || '-'}</span>
+                ) : campo.tipo === 'textarea' ? (
+                  <textarea
                     placeholder={campo.placeholder || ''}
                     value={valores[campo.nombre] || ''}
                     onChange={(e) => onChange?.(campo.nombre, e.target.value)}
-                    style={{ width: '100%', padding: '6px' }}
+                    className={styles.textarea}
+                  />
+                ) : campo.tipo === 'select' ? (
+                  <select
+                    value={valores[campo.nombre] || ''}
+                    onChange={(e) => onChange?.(campo.nombre, e.target.value)}
+                    className={styles.select}
+                  >
+                    <option value="">Selecciona una opción</option>
+                    {campo.opciones?.map((op) => (
+                      <option key={op.value} value={op.value}>
+                        {op.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : campo.tipo === 'checkbox' ? (
+                  <input
+                    type="checkbox"
+                    checked={!!valores[campo.nombre]}
+                    onChange={(e) => onChange?.(campo.nombre, e.target.checked)}
+                    className={styles.checkbox}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    placeholder={campo.placeholder || ''}
+                    value={valores[campo.nombre] || ''}
+                    onChange={(e) => onChange?.(campo.nombre, e.target.value)}
+                    className={styles.input}
                   />
                 )}
               </td>
@@ -55,10 +84,7 @@ const FormularioTabla: React.FC<Props> = ({
       </table>
 
       {!soloLectura && onSubmit && (
-        <button
-          onClick={onSubmit}
-          style={{ marginTop: '1rem', padding: '0.5rem 1rem' }}
-        >
+        <button onClick={onSubmit} className={styles.boton}>
           {botonTexto}
         </button>
       )}

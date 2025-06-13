@@ -9,7 +9,10 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
-// Ruta GET para obtener todas las obras
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+});
 app.get('/obras', async (req, res) => {
   try {
     const obras = await prisma.obra.findMany();
@@ -19,12 +22,6 @@ app.get('/obras', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener obras' });
   }
 });
-
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-});
-
 app.post('/obras', async (req, res) => {
   const { nombre, direccion, fechaInicio, fechaFin, estado } = req.body;
 

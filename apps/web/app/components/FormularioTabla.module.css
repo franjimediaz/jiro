@@ -1,0 +1,79 @@
+.formWrapper {
+  padding: 2rem;
+  background: #f0f6fc;
+  border-radius: 16px;
+  max-width: 800px;
+  margin: auto;
+  box-shadow: 0 4px 12px rgba(0, 118, 255, 0.08);
+}
+
+.titulo {
+  margin-bottom: 1.5rem;
+  color: #1e3a8a;
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.formularioTabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.etiqueta {
+  padding: 12px;
+  font-weight: 500;
+  color: #1e3a8a;
+  width: 30%;
+  vertical-align: top;
+}
+
+.campo {
+  padding: 12px;
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #cbd5e0;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 1rem;
+  color: #2a4365;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  outline: none;
+  border-color: #4299e1;
+  background-color: #f0faff;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.checkbox {
+  transform: scale(1.3);
+  accent-color: #4299e1;
+}
+
+.boton {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #3182ce;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.boton:hover {
+  background: #2b6cb0;
+}
