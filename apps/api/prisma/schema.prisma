@@ -86,6 +86,7 @@ model ST_Material{
   cantidad         Int
   preciounidad     Int
   total            Int
+  facturable      Boolean @default(false)
   material          Materiales? @relation(fields: [materialesId], references: [id])
 }
 

@@ -11,7 +11,7 @@ const campos = [
   { nombre: 'precio', etiqueta: 'Precio' },
   { nombre: 'proveedor', etiqueta: 'Proveedor'},
   { nombre: 'stockActual', etiqueta: 'Stock' },
-  { nombre: 'unidadMedida', etiqueta: 'Unidad', tipo:'select' },
+  { nombre: 'unidadMedida', etiqueta: 'Unidad' },
 
 ];
 
@@ -19,30 +19,31 @@ export default function Nuevamaterial() {
   const router = useRouter();
 
   const [valores, setValores] = useState({
-    nombre: '',
-    direccion: '',
-    fechaInicio: '',
-    fechaFin: '',
-    estado: '',
-    clienteID:'',
-  });
+  nombre: '',
+  descripcion: '',
+  precio: '',          // ⚠️ string en el formulario, pero luego se convierte a número
+  proveedor: '',
+  stockActual: '',     // opcional
+  unidadMedida: '',    // opcional
+});
+
 
   const handleChange = (nombre: string, valor: any) => {
     setValores((prev) => ({ ...prev, [nombre]: valor }));
   };
 
   const handleSubmit = async () => {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/materiales', {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/materiales`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(valores),
     });
 
     if (res.ok) {
-      alert('material creada correctamente');
+      alert('material creado correctamente');
       router.push('/materiales');
     } else {
-      alert('Error al crear la material');
+      alert('Error al crear material');
     }
   };
 

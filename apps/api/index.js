@@ -212,10 +212,10 @@ app.get('/servicios', async (req, res) => {
 });
 app.get('/materiales', async (req, res) => {
   try {
-    const materiales = await prisma.obra.findMany();
+    const materiales = await prisma.materiales.findMany();
     res.json(materiales);
   } catch (error) {
-    console.error(error);
+    console.error('[GET /materiales] Error al obtener materiales:', error);
     res.status(500).json({ error: 'Error al obtener materiales' });
   }
 });
@@ -425,27 +425,39 @@ app.post('/servicios_tarea', async (req, res) => {
 });
 
 app.post('/materiales', async (req, res) => {
+  const {
+    nombre,
+    descripcion,
+    precio,
+    proveedor,
+    stockActual,
+    unidadMedida,
+  } = req.body;
+
+  // Validación de campos obligatorios
+  if (!nombre || !descripcion || !proveedor || isNaN(Number(precio))) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios o precio no válido' });
+  }
+
   try {
-    const { nombre, color, icono } = req.body;
-
-    if (!nombre || !color || !icono) {
-      return res.status(400).json({ error: 'Faltan campos obligatorios.' });
-    }
-
     const nuevoMaterial = await prisma.materiales.create({
       data: {
         nombre,
-        color,
-        icono,
+        descripcion,
+        precio: Number(precio),
+        proveedor,
+        stockActual: stockActual ? Number(stockActual) : null,
+        unidadMedida: unidadMedida || null,
       },
     });
 
     res.status(201).json(nuevoMaterial);
   } catch (error) {
-    console.error('Error al crear material:', error);
-    res.status(500).json({ error: 'Error interno del servidor.' });
+    console.error('❌ Error al crear material:', error);
+    res.status(500).json({ error: 'Error interno al crear el material', detalle: error.message });
   }
 });
+
 app.post('/modulos', async (req, res) => {
   try {
     const { nombre, ruta, icono, orden, padreId } = req.body;

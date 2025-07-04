@@ -21,17 +21,17 @@ export default function materialesPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch('${process.env.NEXT_PUBLIC_API_URL}/materiales')
-      .then(res => res.json())
-      .then(data => {
-        setmateriales(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error al obtener materiales:', err);
-        setLoading(false);
-      });
-  }, []);
+  fetch(`${process.env.NEXT_PUBLIC_API_URL}/materiales`)
+    .then(res => res.json())
+    .then(data => {
+      setmateriales(data);
+      setLoading(false);
+    })
+    .catch(err => {
+      console.error('Error al obtener materiales:', err);
+      setLoading(false);
+    });
+}, []);
 
   const handleEliminar = (material: any) => {
     if (confirm(`¿Eliminar material "${material.nombre}"?`)) {
@@ -48,18 +48,8 @@ export default function materialesPage() {
 
   const columnas = [
     { clave: 'nombre', encabezado: 'Nombre' },
-    { clave: 'direccion', encabezado: 'Dirección' },
-    { clave: 'estado', encabezado: 'Estado' },
-    {
-      clave: 'fechaInicio',
-      encabezado: 'Inicio',
-      render: (valor: string) => new Date(valor).toLocaleDateString(),
-    },
-    {
-      clave: 'fechaFin',
-      encabezado: 'Fin',
-      render: (valor: string) => new Date(valor).toLocaleDateString(),
-    },
+    { clave: 'stockActual', encabezado: 'Stock' },
+    { clave: 'precio', encabezado: 'Precio' },
   ];
 
   return (
