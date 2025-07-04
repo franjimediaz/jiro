@@ -21,7 +21,7 @@ export default function ObrasPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch('http://localhost:3001/obras')
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras`)
       .then(res => res.json())
       .then(data => {
         setObras(data);
@@ -33,10 +33,22 @@ export default function ObrasPage() {
       });
   }, []);
 
+  const handleEliminar = (obra: any) => {
+    if (confirm(`¿Eliminar obra "${obra.nombre}"?`)) {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras/${obra.id}`, {
+        method: 'DELETE',
+      })
+        .then(() => {
+          setObras((prev) => prev.filter((o) => o.id !== obra.id));
+          alert('Obra eliminada');
+        })
+        .catch(() => alert('Error al eliminar'));
+    }
+  };
+
   const columnas = [
     { clave: 'nombre', encabezado: 'Nombre' },
     { clave: 'direccion', encabezado: 'Dirección' },
-    { clave: 'estado', encabezado: 'Estado' },
     {
       clave: 'fechaInicio',
       encabezado: 'Inicio',
@@ -69,9 +81,9 @@ export default function ObrasPage() {
             titulo=""
             columnas={columnas}
             datos={obras}
-            onVer={(obra) => alert(`Ver obra ID ${obra.id}`)}
-            onEditar={(obra) => alert(`Editar obra ID ${obra.id}`)}
-            onEliminar={(obra) => alert(`Eliminar obra ID ${obra.id}`)}
+            onVer={(obras) => router.push(`/obras/${obras.id}`)}
+            onEditar={(obras) => router.push(`/obras/${obras.id}?edit=true`)}
+            onEliminar={handleEliminar}
           />
         )}
       </div>

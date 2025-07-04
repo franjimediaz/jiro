@@ -1,29 +1,67 @@
-table {
+.tabla-container {
+  padding: 1rem;
+}
+
+.tabla-titulo {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.tabla-listado {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 1rem;
-  font-family: 'Segoe UI', sans-serif;
-  font-size: 0.95rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-thead {
-  background-color: #f3f4f6;
-}
-
-th,
-td {
+.tabla-listado th {
+  background-color: #03356893;
   text-align: left;
   padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  color: #fcfafa;
 }
 
-tr:hover {
+.tabla-listado td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.tabla-listado tr:hover {
   background-color: #f9fafb;
-  transition: background-color 0.2s;
 }
 
-h2 {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  color: #111827;
+.tabla-acciones {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background-color 0.2s ease;
+}
+
+.btn-ver {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.btn-editar {
+  background-color: #ecfccb;
+  color: #365314;
+}
+
+.btn-eliminar {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.btn:hover {
+  opacity: 0.9;
 }

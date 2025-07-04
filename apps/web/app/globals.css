@@ -35,6 +35,87 @@ a {
 .imgDark {
   display: none;
 }
+.btn {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilo para botón de inicializar */
+.btn-inicializar {
+  background-color: #4caf50;
+  color: white;
+}
+
+.btn-inicializar:hover {
+  background-color: #45a045;
+}
+
+/* Estilo para botón de eliminar */
+.btn-eliminar-todo {
+  background-color: #e53935;
+  color: white;
+}
+
+.btn-eliminar-todo:hover {
+  background-color: #c62828;
+}
+.boton-flotante {
+  top: 12px;
+  right: 12px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #007bff, #3399ff);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25);
+  cursor: pointer;
+  z-index: 1000;
+  transition: all 0.25s ease;
+}
+
+.boton-flotante:hover {
+  background: linear-gradient(135deg, #0062cc, #268cff);
+  box-shadow: 0 6px 14px rgba(0, 123, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.boton-flotante:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+
+.boton-flotante:disabled {
+  background: #c0c0c0;
+  color: #f1f1f1;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.fila-derecha {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center; /* opcional, alinea verticalmente */
+  margin: 16px 0; /* espaciado arriba y abajo */
+  gap: 12px; /* opcional si tienes más de un botón */
+}
+.botonPresupuestoWrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end; /* Alineado a la derecha */
+}
+
+@media (max-width: 768px) {
+  .botonPresupuestoWrapper {
+    justify-content: center; /* Centrado en móviles */
+  }
+}
 
 @media (prefers-color-scheme: dark) {
   html {

@@ -1,0 +1,31 @@
+.botonCrear {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #4CAF50; /* verde pastel */
+  color: #fff;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.botonCrear:hover {
+  background-color: #45a049;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+}
+
+.botonCrear:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.botonCrear:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}

@@ -1,4 +1,5 @@
-// Migraciones npx prisma migrate dev --name init
+// ----------------------------------------------------Migraciones: npx prisma migrate dev
+// ---------------------------------------------------- Eliminar todo npx prisma migrate reset
 
 generator client {
   provider = "prisma-client-js"
@@ -8,18 +9,149 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ------------------------------------------------------------------OBRAS -----------------------------------------------------------------------
 model Obra {
-  id          Int      @id @default(autoincrement())
-  nombre      String
-  direccion   String
-  fechaInicio DateTime
-  fechaFin    DateTime
-  estado      String
-  createdAt   DateTime @default(now())
+  id             Int               @id @default(autoincrement())
+  nombre         String
+  descripcion    String? // opcional
+  direccion      String
+  fechaInicio    DateTime
+  fechaFin       DateTime
+  estadoId       Int?
+  estado         Estados?          @relation(fields: [estadoId], references: [id])
+  createdAt      DateTime          @default(now())
+  clienteId      Int
+  cliente        Cliente           @relation(fields: [clienteId], references: [id])
+  serviciosTarea Servicios_Tarea[]
+  Presupuestos Presupuesto[]
 }
+
 model Cliente {
-  id       Int     @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
+  nombre    String
+  apellido  String
+  dni       String?
+  direccion String
+  email     String
+  telefono  String
+  obras     Obra[]
+  Presupuestos Presupuesto[]
+}
+
+model Usuario {
+  id       Int               @id @default(autoincrement())
   nombre   String
+  apellido String
   email    String
   telefono String
+  tareas   Servicios_Tarea[]     @relation("UsuarioTareas")
+  rol      String    @default("operario")    
+  activo   Boolean @default(true)
+}
+
+model Tareas {
+  id             Int               @id @default(autoincrement())
+  nombre         String
+  descripcion    String
+  estadoId       Int?
+  estado         Estados?          @relation(fields: [estadoId], references: [id])
+  serviciosTarea Servicios_Tarea?  @relation("RelacionTarea")
+}
+
+model Servicios {
+  id             Int               @id @default(autoincrement())
+  nombre         String
+  color          String
+  icono          String
+  serviciosTarea Servicios_Tarea[]
+}
+
+model Materiales {
+  id             Int               @id @default(autoincrement())
+  nombre         String
+  descripcion    String
+  precio         Int
+  proveedor      String
+  stockActual Int?
+  unidadMedida String? // Ej: kg, m2, litros
+  serviciosTarea Servicios_Tarea[]
+  ST_Material ST_Material[]
+}
+
+model ST_Material{
+  id             Int               @id @default(autoincrement())
+  ServicioTareaId  Int       
+  materialesId      Int
+  cantidad         Int
+  preciounidad     Int
+  total            Int
+  material          Materiales? @relation(fields: [materialesId], references: [id])
+}
+
+model Presupuesto{
+  id             Int               @id @default(autoincrement())
+  nombre        String
+  descripción   String
+  createdAt     DateTime          @default(now())
+  aceptado      Boolean @default(false)
+  clienteId     Int
+  Cliente       Cliente? @relation(fields: [clienteId], references: [id])
+  obraId        Int
+  Obra       Obra? @relation(fields: [obraId], references: [id])
+
+}
+
+model Servicios_Tarea {
+  id                 Int        @id @default(autoincrement())
+  obraId            Int
+  servicioId        Int
+  tareaId           Int?         @unique                // Puede no haber tarea asociada aún
+  materialesId      Int?                        // Material opcional
+  usuarioId         Int?                    
+  fechaInicio       DateTime?                    // Opcional
+  fechaFin          DateTime?                    // Opcional
+  precioManoObra    Float?                       // Opcional
+  cantidadMateriales Float?                      // Opcional
+  precioMateriales  Float?                       // Opcional
+  total             Float? 
+
+  obra              Obra       @relation(fields: [obraId], references: [id])
+  servicio          Servicios   @relation(fields: [servicioId], references: [id])
+  material          Materiales? @relation(fields: [materialesId], references: [id])
+  tarea             Tareas?     @relation("RelacionTarea", fields: [tareaId], references: [id])
+  usuario           Usuario? @relation("UsuarioTareas", fields: [usuarioId], references: [id])
+  
+  
+
+@@map("Servicios_Tarea") // Opcional: si usas nombre exacto en la base de datos
+}
+
+// ------------------------------------------------------------------Otros -----------------------------------------------------------------------
+model Branding {
+  id                 Int        @id @default(autoincrement())
+  nombre String
+  CIF String
+  dirección String
+
+}
+model Modulo {
+  id          Int       @id @default(autoincrement())
+  nombre      String
+  icono       String?
+  ruta        String?
+  orden       Int?
+  padreId     Int?                     // Clave foránea
+  padre       Modulo?   @relation("ModuloJerarquia", fields: [padreId], references: [id])
+  hijos       Modulo[]  @relation("ModuloJerarquia") // Relación inversa
+}
+model Estados {
+  id             Int               @id @default(autoincrement())
+  nombre         String
+  color          String
+  icono          String
+  obra           Obra[]
+  tarea          Tareas[]
+
+  
 }

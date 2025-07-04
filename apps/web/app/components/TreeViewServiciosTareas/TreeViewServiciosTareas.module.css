@@ -1,0 +1,146 @@
+.contenedor {
+  background: #9dc8f385;
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 118, 255, 0.08);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.btnCrear {
+  background-color: #0d1d49;
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.btnCrear:hover {
+  background-color: #0059c1;
+}
+
+.lista {
+  list-style: none;
+  padding-left: 0;
+}
+
+.nodo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+  margin-bottom: 0.5rem;
+  transition: background 0.3s;
+}
+
+.nodo:hover {
+  background: #f1f8ff;
+}
+
+.toggle {
+  font-size: 1.2rem;
+  cursor: pointer;
+  margin-right: 0.8rem;
+  color: #555;
+  user-select: none;
+  transition: transform 0.2s;
+}
+
+.descripcion {
+  flex-grow: 1;
+  font-weight: 500;
+  color: #222;
+}
+
+.btnTarea {
+  background-color: #38a169;
+  color: white;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.3s;
+  margin-left: 1rem;
+}
+
+.btnTarea:hover {
+  background-color: #2f855a;
+}
+
+.sublista {
+  list-style: none;
+  padding-left: 2rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tarea {
+  padding: 0.4rem 0;
+}
+
+.tarea a {
+  text-decoration: none;
+  color: #0070f3;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.tarea a:hover {
+  color: #0056b3;
+}
+.totalServicio {
+  margin-left: 1rem;
+  font-weight: bold;
+  color: #2b8a3e;
+}
+
+.totalTarea {
+  margin-left: 1rem;
+  font-size: 0.9rem;
+  color: #1971c2;
+}
+
+.fechas {
+  margin-left: 0.5rem;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.tareaNombre {
+  font-weight: 500;
+  color: #1a1a1a;
+  text-decoration: underline;
+}
+.btnEliminarServicio,
+.btnEliminarTarea {
+  background: none;
+  border: none;
+  color: #c53030;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-left: 0.5rem;
+  transition: transform 0.1s ease;
+}
+
+.btnEliminarServicio:hover,
+.btnEliminarTarea:hover {
+  transform: scale(1.2);
+}

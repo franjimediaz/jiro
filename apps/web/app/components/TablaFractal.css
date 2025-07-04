@@ -1,0 +1,83 @@
+.tabla-container {
+  margin-top: 20px;
+  overflow-x: auto;
+  background: #ffffff;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.tabla-fractal {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+.tabla-fractal th,
+.tabla-fractal td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tabla-fractal th {
+  background-color: #f5f7fa;
+  font-weight: 600;
+  color: #0d1d49;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tabla-fractal tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.tabla-fractal tr:hover {
+  background-color: #eef3fc;
+}
+
+.tabla-titulo {
+  margin-bottom: 12px;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #0d1d49;
+}
+
+.tabla-acciones {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btn-editar {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.btn-editar:hover {
+  background-color: #e0a800;
+  transform: scale(1.05);
+}
+
+.btn-eliminar {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.btn-eliminar:hover {
+  background-color: #c82333;
+  transform: scale(1.05);
+}
+.tabla-fractal td span {
+  font-weight: bold;
+}

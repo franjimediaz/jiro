@@ -9,7 +9,23 @@ const campos = [
   { nombre: 'direccion', etiqueta: 'Dirección' },
   { nombre: 'fechaInicio', etiqueta: 'Fecha de inicio', tipo: 'date' },
   { nombre: 'fechaFin', etiqueta: 'Fecha de fin', tipo: 'date' },
-  { nombre: 'estado', etiqueta: 'Estado' },
+    {
+    nombre: 'estadoId',
+    etiqueta: 'Estado',
+    tipo: 'selectorTabla',
+    tabla: 'estados',
+    campoLabel: 'nombre',
+    campoValue: 'id',
+  },
+  {
+    nombre: 'clienteId',
+    etiqueta: 'Cliente',
+    tipo: 'selectorTabla',
+    tabla: 'clientes',
+    campoLabel: 'nombre',
+    campoValue: 'id',
+  },
+
 ];
 
 export default function NuevaObra() {
@@ -20,7 +36,8 @@ export default function NuevaObra() {
     direccion: '',
     fechaInicio: '',
     fechaFin: '',
-    estado: '',
+    estadoId: '',
+    clienteId:'',
   });
 
   const handleChange = (nombre: string, valor: any) => {
@@ -28,19 +45,24 @@ export default function NuevaObra() {
   };
 
   const handleSubmit = async () => {
-    const res = await fetch('http://localhost:3001/obras', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(valores),
-    });
+  console.log('Datos a enviar:', valores); // 👈 AÑADE ESTE LOG
 
-    if (res.ok) {
-      alert('Obra creada correctamente');
-      router.push('/obras');
-    } else {
-      alert('Error al crear la obra');
-    }
-  };
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(valores),
+  });
+
+  const data = await res.json();
+  console.log('Respuesta del backend:', data); // 👈 AÑADE ESTE LOG
+
+  if (res.ok) {
+    alert('Obra creada correctamente');
+    router.push('/obras');
+  } else {
+    alert(`Error al crear la obra: ${data?.detalle}`);
+  }
+};
 
   return (
     <FormularioTabla
