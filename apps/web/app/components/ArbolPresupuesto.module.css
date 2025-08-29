@@ -1,0 +1,169 @@
+.wrapper {
+  padding: 1.5rem 2rem;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  max-width: 800px;
+  margin: 2rem auto;
+}
+
+.titulo {
+  font-size: 1.6rem;
+  margin-bottom: 1.5rem;
+  color: #2d3748;
+  text-align: center;
+}
+
+.nodo {
+  margin-bottom: 1.25rem;
+  border-left: 2px dashed #cbd5e0;
+  padding-left: 1rem;
+}
+
+.toggle {
+  cursor: pointer;
+  font-weight: 600;
+  color: #3182ce;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.toggle:hover {
+  color: #2c5282;
+}
+
+.toggle::before {
+  content: '▶';
+  margin-right: 6px;
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.toggle.abierto::before {
+  transform: rotate(90deg);
+}
+
+.tarea {
+  margin-left: 1rem;
+  color: #4a5568;
+  font-style: italic;
+  padding: 0.3rem 0.5rem;
+  background-color: #f7fafc;
+  border-left: 3px solid #a0aec0;
+  border-radius: 4px;
+  margin-top: 0.3rem;
+}
+
+.material {
+  margin-left: 2rem;
+  color: #718096;
+  font-size: 0.88rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid #e2e8f0;
+}
+
+
+
+
+
+
+
+
+
+
+.resumen {
+  margin-top: 2rem;
+  padding: 1rem 1.5rem;
+  background-color: #f1f1f1;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #333;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.resumen p {
+  margin: 0.5rem 0;
+}
+.variablesBox {
+  margin-top: 2rem;
+  padding: 1rem 1.5rem;
+  background-color: #f4f4f4;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.variablesBox h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.campoControl {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.campoControl label {
+  font-weight: 500;
+  color: #444;
+  min-width: 120px;
+}
+
+.campoControl input,
+.campoControl select {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  min-width: 120px;
+}
+
+.botonGuardar {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+  background-color: #0066cc;
+  color: white;
+  border: none;
+  padding: 0.5rem 1.1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.botonGuardar:hover {
+  background-color: #004fa3;
+}
+
+
+
+.botonPDF {
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  background-color: #2b6cb0;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.botonPDF:hover {
+  background-color: #1e4e8c;
+  transform: translateY(-2px);
+}
+
+.botonPDF:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}

@@ -17,7 +17,11 @@ const Sidebar = () => {
     };
     cargar();
   }, []);
-
+  const handleLogout = () => {
+    // Aquí puedes limpiar cookies, localStorage o llamar a una API de logout
+    localStorage.removeItem('token'); // ejemplo
+    router.push('/login');
+  };
   const asignarPadres = (lista: any[], padre: any = null): any[] =>
     lista.map((modulo) => {
       const copia = { ...modulo, padre };
@@ -40,7 +44,7 @@ const Sidebar = () => {
 
   return (
     <aside className={styles.sidebar}>
-      <Link href="/" className={styles.title}>
+      <Link href="/dashboard" className={styles.title}>
       <h2>JiRo</h2>
       </Link>
       <nav className={styles.nav}>
@@ -59,6 +63,11 @@ const Sidebar = () => {
           </button>
         ))}
       </nav>
+      <div className={styles.logoutContainer}>
+        <button className={styles.logoutButton} onClick={handleLogout}>
+          Cerrar sesión
+        </button>
+      </div>
     </aside>
   );
 };

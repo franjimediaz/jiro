@@ -48,17 +48,8 @@ export default function PresupuestosPage() {
 
   const columnas = [
     { clave: 'nombre', encabezado: 'Nombre' },
-    { clave: 'direccion', encabezado: 'Dirección' },
-    {
-      clave: 'fechaInicio',
-      encabezado: 'Inicio',
-      render: (valor: string) => new Date(valor).toLocaleDateString(),
-    },
-    {
-      clave: 'fechaFin',
-      encabezado: 'Fin',
-      render: (valor: string) => new Date(valor).toLocaleDateString(),
-    },
+    {clave: 'aceptado',encabezado: 'Aceptado',},
+    {clave: 'importe',encabezado: 'Importe',},
   ];
 
   return (
@@ -75,8 +66,8 @@ export default function PresupuestosPage() {
             titulo=""
             columnas={columnas}
             datos={Presupuestos}
-            onVer={(Presupuestos) => router.push(`/Presupuestos/${Presupuestos.id}`)}
-            onEditar={(Presupuestos) => router.push(`/Presupuestos/${Presupuestos.id}?edit=true`)}
+            onVer={(Presupuestos) => router.push(`presupuestos/${Presupuestos.id}`)}
+            onEditar={(Presupuestos) => router.push(`presupuestos/${Presupuestos.id}?edit=true`)}
             onEliminar={handleEliminar}
           />
         )}

@@ -135,7 +135,7 @@ const handleEliminarTarea = async (tareaId: number) => {
     {(serv.serviciosTarea ?? []).map((st) => (
               <li key={st.id} className={styles.tarea}>
                 <Link
-                  href={`/obras/tareas/create?obraId=${obraId}&servicioId=${serv.id}&servicioTareaId=${st.id}`}
+                  href={`/obras/tareas/${st.tarea?.id}`}
                   className={styles.tareaNombre}
                 >
                   {st.tarea?.nombre || 'Tarea sin nombre'}

@@ -41,7 +41,7 @@ export default function Nuevamaterial() {
 
     if (res.ok) {
       alert('material creado correctamente');
-      router.push('/materiales');
+      router.back;
     } else {
       alert('Error al crear material');
     }

@@ -1,5 +1,7 @@
 .tabla-container {
   padding: 1rem;
+  overflow: visible;
+  position: relative;
 }
 
 .tabla-titulo {
@@ -17,7 +19,7 @@
 }
 
 .tabla-listado th {
-  background-color: #03356893;
+  background: linear-gradient(to bottom, #0d1d49, #1a2a5f);
   text-align: left;
   padding: 12px;
   font-weight: 600;
@@ -64,4 +66,100 @@
 
 .btn:hover {
   opacity: 0.9;
+}
+.menu-acciones-wrapper {
+  position: relative;
+}
+
+.btn-menu-acciones {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.menu-acciones-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  min-width: 120px;
+  padding: 5px 0;
+}
+
+.menu-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.menu-item:hover {
+  background-color: #f0f0f0;
+}
+.tabla-listado {
+  position: relative;
+  overflow: visible;
+}
+
+.menu-acciones-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.menu-acciones-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: white;
+  border: 1px solid #ccc;
+  z-index: 100;
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
+  min-width: 120px;
+  padding: 4px;
+}
+
+.menu-item {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background-color: #f0f0f0;
+}
+
+.btn-menu-acciones {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.tabla-container::after {
+  content: '';
+  display: block;
+  height: 80px; /* deja espacio para el dropdown del último botón */
+}
+.paginacion {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.paginacion button {
+  padding: 4px 10px;
+  border: 1px solid #ccc;
+  background-color: white;
+  cursor: pointer;
+}
+
+.paginacion button.activo {
+  background-color: #007bff;
+  color: white;
+  border-color: #007bff;
 }

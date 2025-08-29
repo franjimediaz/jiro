@@ -41,9 +41,11 @@ model Cliente {
 
 model Usuario {
   id       Int               @id @default(autoincrement())
+  idUsuario String
   nombre   String
   apellido String
-  email    String
+  email    String         @unique
+  passwordHash String
   telefono String
   tareas   Servicios_Tarea[]     @relation("UsuarioTareas")
   rol      String    @default("operario")    
@@ -54,6 +56,7 @@ model Tareas {
   id             Int               @id @default(autoincrement())
   nombre         String
   descripcion    String
+  progreso       Int?
   estadoId       Int?
   estado         Estados?          @relation(fields: [estadoId], references: [id])
   serviciosTarea Servicios_Tarea?  @relation("RelacionTarea")
@@ -66,6 +69,7 @@ model Servicios {
   icono          String
   serviciosTarea Servicios_Tarea[]
 }
+
 
 model Materiales {
   id             Int               @id @default(autoincrement())
@@ -88,6 +92,17 @@ model ST_Material{
   total            Int
   facturable      Boolean @default(false)
   material          Materiales? @relation(fields: [materialesId], references: [id])
+  servicioTarea     Servicios_Tarea  @relation(fields: [ServicioTareaId], references: [id])
+}
+model Facturas {
+  id             Int               @id @default(autoincrement())
+  referencia      String
+  fecha           DateTime
+  cobrada         Boolean @default(false)
+  cantidad        Int?
+  servicio   Presupuesto_Servicio[]
+  presupuestoId Int
+  Presupuesto       Presupuesto? @relation(fields: [presupuestoId], references: [id])
 }
 
 model Presupuesto{
@@ -96,12 +111,55 @@ model Presupuesto{
   descripción   String
   createdAt     DateTime          @default(now())
   aceptado      Boolean @default(false)
+  importe       Float     @default(0)
+  ivaPorcentaje   Float     @default(21)
+  descuentoTipo   String    @default("porcentaje") // "porcentaje" o "valor"
+  descuentoValor  Float     @default(0)
   clienteId     Int
   Cliente       Cliente? @relation(fields: [clienteId], references: [id])
   obraId        Int
   Obra       Obra? @relation(fields: [obraId], references: [id])
-
+  servicios      Presupuesto_Servicio[]
+  facturas      Facturas[]
+  condiciones  String?
 }
+model Presupuesto_Tarea {
+  id                      Int    @id @default(autoincrement())
+  nombre                  String
+  descripcion             String
+  presupuestoServicioId   Int
+  tareaId                 Int?
+  precioManoObra          Int?
+  total                   Int?
+  cantidad                Int?
+  totalMateriales         Int?
+  presupuestoServicio     Presupuesto_Servicio @relation(fields: [presupuestoServicioId], references: [id])
+  materiales              Presupuesto_Material[]
+}
+model Presupuesto_Material {
+  id                 Int    @id @default(autoincrement())
+  presupuestoTareaId Int
+  nombre             String
+  cantidad           Int
+  precioUnidad       Int
+  total              Int
+  facturable        Boolean
+
+  presupuestoTarea Presupuesto_Tarea @relation(fields: [presupuestoTareaId], references: [id])
+}
+
+
+model Presupuesto_Servicio {
+  id             Int      @id @default(autoincrement())
+  nombre         String
+  presupuestoId  Int
+  servicioId     Int
+  facturaId        Int?
+  presupuesto    Presupuesto @relation(fields: [presupuestoId], references: [id])
+  tareas         Presupuesto_Tarea[]
+  factura    Facturas? @relation(fields: [facturaId], references: [id])
+}
+
 
 model Servicios_Tarea {
   id                 Int        @id @default(autoincrement())
@@ -109,6 +167,7 @@ model Servicios_Tarea {
   servicioId        Int
   tareaId           Int?         @unique                // Puede no haber tarea asociada aún
   materialesId      Int?                        // Material opcional
+  stMateriales      ST_Material[]
   usuarioId         Int?                    
   fechaInicio       DateTime?                    // Opcional
   fechaFin          DateTime?                    // Opcional
@@ -130,10 +189,21 @@ model Servicios_Tarea {
 
 // ------------------------------------------------------------------Otros -----------------------------------------------------------------------
 model Branding {
-  id                 Int        @id @default(autoincrement())
-  nombre String
-  CIF String
-  dirección String
+  id            Int     @id @default(autoincrement())
+  nombre        String  // nombre fiscal de la empresa
+  CIF           String
+  direccion     String
+  codigoPostal  String
+  localidad     String
+  provincia     String
+  telefono      String
+  email         String
+  web           String?
+  logoUrl       String? 
+  colorGeneral  String?
+  colorPDF  String?
+  CondicionesPresupuesto  String?
+  firma         String?
 
 }
 model Modulo {
@@ -155,4 +225,14 @@ model Estados {
   tarea          Tareas[]
 
   
+}
+
+model Documento {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  url         String
+  tipo        String
+  tabla       String   // ejemplo: "obras", "clientes"
+  registroId  Int
+  creadoEn    DateTime @default(now())
 }

@@ -1,0 +1,46 @@
+.wrapper {
+  padding: 0.5rem;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.tabla th,
+.tabla td {
+  border: 1px solid #ccc;
+  padding: 0.4rem;
+  text-align: left;
+}
+
+.input {
+  width: 100%;
+  padding: 0.3rem;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.botonAgregar {
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  border: none;
+  background-color: #007bff;
+  color: white;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.botonEliminar {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: red;
+  font-size: 1rem;
+}

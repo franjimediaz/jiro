@@ -1,0 +1,42 @@
+.contenedor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  justify-content: space-between;
+  margin-top: 2rem;
+   justify-content: center; /* centra el grupo */
+  align-items: flex-start; /* alinea arriba */
+  flex-wrap: wrap;   
+}
+
+.tarjeta {
+  min-width: 280px;
+  background: linear-gradient(#0d1d49, #1a2a5f);
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tarjeta:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+.tarjeta h3 {
+  margin-bottom: 1rem;
+  font-size: 1.4rem;
+  color: #fcfcfc;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 0.5rem;
+}
+
+.tarjeta p {
+  margin: 0.6rem 0;
+  font-size: 1rem;
+  color: #fdfcfc;
+  line-height: 1.5;
+}
+.tarjeta h3 span {
+  margin-right: 0.5rem;
+}

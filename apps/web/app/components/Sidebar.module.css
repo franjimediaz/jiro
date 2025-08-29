@@ -93,3 +93,23 @@
 .volver:hover {
   background-color: rgba(255, 255, 255, 0.2);
 }
+.logoutContainer {
+  position: absolute;
+  bottom: 1rem;
+  width: 100%;
+  text-align: center;
+}
+
+.logoutButton {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.logoutButton:hover {
+  background-color: #c0392b;
+}

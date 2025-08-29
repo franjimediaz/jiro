@@ -5,10 +5,15 @@ import { useRouter } from 'next/navigation';
 import FormularioTabla from '../../components/FormularioTabla';
 
 
+
+
+
 const campos = [
+   {nombre: 'idUsuario', etiqueta: 'Id Usuario' },
   { nombre: 'nombre', etiqueta: 'Nombre' },
   { nombre: 'apellido', etiqueta: 'Apellido' },
   { nombre: 'email', etiqueta: 'Email'},
+  { nombre: 'password', etiqueta: 'Contraseña'},
   { nombre: 'telefono', etiqueta: 'Teléfono'},
   { nombre: 'rol', etiqueta: 'Roles' },
   {nombre: 'activo',etiqueta: 'Activo', tipo: 'checkbox'},
@@ -20,11 +25,13 @@ export default function Nuevausuario() {
 
   const [valores, setValores] = useState({
     nombre: '',
-    direccion: '',
-    fechaInicio: '',
-    fechaFin: '',
-    estado: '',
-    clienteID:'',
+    apellido: '',
+    activo: '',
+    password: '',
+    telefono: '',
+    rol: '',
+    email: '',
+    idUsuario:'',
   });
 
   const handleChange = (nombre: string, valor: any) => {

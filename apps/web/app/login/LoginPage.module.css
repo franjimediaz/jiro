@@ -1,0 +1,154 @@
+/* apps/web/app/login/LoginPage.module.css */
+
+.container {
+  width: 100vw;
+  height: 100vh;
+  background-image: url('/login_background.png');
+  background-size: cover;
+  background-position: 0% 22%;
+  background-repeat: no-repeat;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  
+  font-family: 'Segoe UI', sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+
+.background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* ✅ ajusta bien al fondo, puede recortar si no tiene la misma proporción */
+  z-index: -1;
+}
+
+.contenidoLogin {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  padding: 2rem;
+  border-radius: 12px;
+  background-color: rgba(255, 255, 255, 0.85); /* o el color que desees */
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+
+  z-index: 2;
+}
+.sidebar {
+  width: 100%;
+  max-width: 450px;
+  height: 100vh;
+  background-color: rgba(3, 31, 121, 0.438);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 3rem 2rem;
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  z-index: 2;
+}
+
+.overlay {
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 3rem;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 400px;
+}
+
+.title {
+  font-size: 1.8rem;
+  margin-bottom: 2rem;
+  text-align: center;
+  color: #333;
+}
+.fondo {
+  flex: 1; /* Ocupa todo lo que el sidebar no use */
+  background-image: url('/jiro_login_bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border 0.2s ease-in-out;
+}
+
+.input:focus {
+  border-color: #4a90e2;
+  outline: none;
+}
+
+.button {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.button:hover {
+  background-color: #357abd;
+}
+
+.error {
+  color: red;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.forgotPassword {
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.forgotPassword a {
+  color: #4a90e2;
+  text-decoration: none;
+}
+
+.forgotPassword a:hover {
+  text-decoration: underline;
+}
+@media (max-width: 768px) {
+    .container {
+    flex-direction: column-reverse; /* sidebar abajo */
+  }
+
+  .contenido-login {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    box-shadow: none;
+  }
+  .sidebar {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    box-shadow: none;
+  }
+}

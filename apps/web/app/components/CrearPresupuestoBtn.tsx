@@ -23,9 +23,24 @@ export default function CrearPresupuestoBtn({
 }: CrearPresupuestoBtnProps) {
   const Icon = iconMap[icono]; // <-- extraemos el componente
 
-  const handleClick = async () => {
+    const handleClick = async () => {
     try {
-      const res = await fetch('/presupuestos', {
+      // ✅ 1. Obtener el importe automático desde el backend
+      const resImporte = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/presupuestos/importe-por-obra/${obraId}`);
+      const dataImporte = await resImporte.json();
+
+      if (!resImporte.ok || dataImporte.importe === undefined) {
+        throw new Error('No se pudo calcular el importe');
+      }
+
+      const importe = dataImporte.importe;
+      const resBranding = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/branding`);
+      const dataBranding = await resBranding.json();
+      console.log('Branding recibido:', dataBranding);
+      const condiciones = dataBranding?.CondicionesPresupuesto || '';
+
+      // ✅ 2. Crear el presupuesto con el importe incluido
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/presupuestos`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -35,26 +50,31 @@ export default function CrearPresupuestoBtn({
           obraId,
           nombre,
           descripcion,
+          importe, // <-- aquí se envía el importe
+          condiciones,
         }),
       });
 
       if (!res.ok) {
-        throw new Error('Error al crear presupuesto');
+        const mensaje = await res.text();
+        throw new Error(`Error al crear presupuesto: ${mensaje}`);
       }
 
-      const data = await res.json();
-      alert('Presupuesto creado correctamente');
-      onSuccess?.(data);
-    } catch (error) {
-      console.error(error);
+      const presupuestoCreado = await res.json();
+      console.log('✅ Presupuesto creado:', presupuestoCreado);
+
+      if (onSuccess) onSuccess(presupuestoCreado);
+
+    } catch (err) {
+      console.error('❌ Error al crear presupuesto', err);
       alert('Error al crear presupuesto');
     }
   };
 
   return (
-    <button onClick={handleClick} className={styles.botonCrear}>
+    <button onClick={handleClick} className="boton-flotante">
       {Icon && <Icon size={20} />}
-      Crear Presupuesto
+       <p>Crear Presupuesto</p>
     </button>
   );
 }

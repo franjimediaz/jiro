@@ -110,6 +110,17 @@ a {
   display: flex;
   justify-content: flex-end; /* Alineado a la derecha */
 }
+.contenedor-formulario {
+  width: 100%;
+  max-width: 1200px;
+  margin: auto;
+}
+
+.alineado-boton {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-start; /* o center o end según cómo esté el formulario */
+}
 
 @media (max-width: 768px) {
   .botonPresupuestoWrapper {

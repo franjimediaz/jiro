@@ -5,9 +5,17 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import FormularioTabla from '../../components/FormularioTabla';
 import TreeViewServiciosTareas from '../../components/TreeViewServiciosTareas/TreeViewServiciosTareas';
 import CrearPresupuestoBtn from '../../components/CrearPresupuestoBtn';
+import type { Columna } from '../../components/TablaListado';
+import TablaListado from '../../components/TablaListado';
 
 
-
+type Presupuesto = {
+  id: number;
+  descripcion: string;
+  importe: number;
+  estado: string;
+  fecha: string;
+};
 
 const campos = [
   { nombre: 'nombre', etiqueta: 'Nombre de la obra' },
@@ -30,6 +38,13 @@ const campos = [
   },
 ];
 
+const columnas: Columna[] = [
+  { clave: 'descripción', encabezado: 'Descripción', tipo: 'texto' },
+  { clave: 'createdAt', encabezado: 'Fecha', tipo: 'texto' },
+  { clave: 'importe', encabezado: '€', tipo: 'texto' },
+  { clave: 'aceptado', encabezado: 'Aceptado', tipo: 'checkbox' },
+];
+
 export default function VerEditarObra() {
   const { id } = useParams();
   const searchParams = useSearchParams();
@@ -46,7 +61,30 @@ export default function VerEditarObra() {
     clienteId: '',
   });
   const [cargando, setCargando] = useState(true);
-  const [generando, setGenerando] = useState(false);
+  
+  const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
+
+useEffect(() => {
+  if (!id) return;
+
+  fetch(`${process.env.NEXT_PUBLIC_API_URL}/presupuestos/por-obra/${id}`)
+    .then(res => res.json())
+    .then(data => {
+      console.log('✅ Datos presupuestos:', data);
+      if (Array.isArray(data)) {
+        setPresupuestos(data);
+      } else {
+        console.error('❌ La respuesta no es un array:', data);
+        setPresupuestos([]); // prevenir errores en la tabla
+      }
+    })
+    .catch(err => {
+      console.error('❌ Error al obtener presupuestos:', err);
+      setPresupuestos([]);
+    });
+}, [id]);
+
+
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/Obras/${id}`)
@@ -87,41 +125,29 @@ export default function VerEditarObra() {
       alert('Error al actualizar');
     }
   };
-  const generarPresupuesto = async () => {
-    if (!valores.nombre || !valores.clienteId) {
-      alert('Faltan datos de la obra');
-      return;
+
+  const handleEliminar = async (id: number) => {
+  if (!confirm('¿Estás seguro de eliminar este presupuesto?')) return;
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${id}`, {
+      method: 'DELETE',
+    });
+    if (res.ok) {
+      setPresupuestos(prev => prev.filter(p => p.id !== id));
+    } else {
+      alert('Error al eliminar presupuesto');
     }
-
-    setGenerando(true);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/presupuestos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: `Presupuesto para ${valores.nombre}`,
-          descripcion: `Presupuesto generado desde la obra "${valores.nombre}"`,
-          clienteId: valores.clienteId,
-          obraId: Number(id),
-        }),
-      });
-
-      if (!res.ok) throw new Error('Error al generar presupuesto');
-
-      const data = await res.json();
-      router.push(`/presupuestos/${data.id}?edit=true`);
-    } catch (err) {
-      console.error(err);
-      alert('No se pudo generar el presupuesto');
-    } finally {
-      setGenerando(false);
-    }
-  };
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo eliminar el presupuesto');
+  }
+};
 
   if (cargando) return <p>Cargando Obra...</p>;
 
   return (
-    <div>
+    <div className="contenedor-formulario">
+    
     <FormularioTabla
       titulo={modoEdicion ? 'Editar Obra' : 'Detalle del Obra'}
       campos={campos}
@@ -131,8 +157,12 @@ export default function VerEditarObra() {
       botonTexto="Guardar cambios"
       soloLectura={!modoEdicion}
     />
-    {!cargando && valores.clienteId && (
-      <div className="boton-presupuesto-wrapper">
+
+    {!cargando && id && (
+      <TreeViewServiciosTareas obraId={Number(id)} />
+    )}
+        {!cargando && valores.clienteId && (
+      <div className="alineado-boton">
       <CrearPresupuestoBtn
         clienteId={Number(valores.clienteId)}
         obraId={Number(id)}
@@ -140,15 +170,20 @@ export default function VerEditarObra() {
         descripcion={`Presupuesto generado desde la obra "${valores.nombre}"`}
         onSuccess={(presupuesto) => {
           console.log('Presupuesto creado:', presupuesto);
-          router.push(`/presupuestos/${presupuesto.id}?edit=true`);
+          router.push(`/obras/presupuestos/${presupuesto.id}?edit=true`);
         }}
       />
       </div>
     )}
-    {!cargando && id && (
-      <TreeViewServiciosTareas obraId={Number(id)} />
-    )}
-    
+     <TablaListado
+            titulo=""
+            columnas={columnas}
+            datos={presupuestos}
+            onVer={(presupuesto) => router.push(`/obras/presupuestos/${presupuesto.id}`)}
+            onEditar={(presupuesto) => router.push(`/obras/presupuestos/${presupuesto.id}?edit=true`)}
+            onEliminar={(presupuestos) => handleEliminar(presupuestos.id)}
+
+          />
     </div>
   );
 }
