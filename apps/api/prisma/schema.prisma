@@ -41,12 +41,12 @@ model Cliente {
 
 model Usuario {
   id       Int               @id @default(autoincrement())
-  idUsuario String
+  idUsuario String        @unique
   nombre   String
   apellido String
   email    String         @unique
-  passwordHash String
-  telefono String
+  passwordHash String?
+  telefono String?
   tareas   Servicios_Tarea[]     @relation("UsuarioTareas")
   rol      String    @default("operario")    
   activo   Boolean @default(true)

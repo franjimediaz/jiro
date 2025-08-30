@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import TablaListado from "../components/TablaListado";
-import styles from "./Usuarios.module.css"; // o donde tengas el CSS
+import TablaListado from "../../components/TablaListado";
+import styles from "./Directorio.module.css"; // o donde tengas el CSS
 import { useRouter } from "next/navigation";
 
 type usuario = {
@@ -47,19 +47,18 @@ export default function usuariosPage() {
 
   const columnas = [
     { clave: "nombre", encabezado: "Nombre" },
-    { clave: "apellido", encabezado: "Apellido" },
-    { clave: "idUsuario", encabezado: "ID Usuario" },
-    { clave: "activo", encabezado: "Activo" },
-  ];
-  const exportC = [
-    { clave: "id", encabezado: "ID" },
-    { clave: "nombre", encabezado: "Nombre" },
-    { clave: "apellido", encabezado: "Apellido" },
-    { clave: "idUsuario", encabezado: "ID Usuario" },
-    { clave: "email", encabezado: "Email" },
-    { clave: "telefono", encabezado: "Teléfono" },
-    { clave: "rol", encabezado: "Rol" },
-    { clave: "activo", encabezado: "Activo" },
+    { clave: "direccion", encabezado: "Dirección" },
+    { clave: "estado", encabezado: "Estado" },
+    {
+      clave: "fechaInicio",
+      encabezado: "Inicio",
+      render: (valor: string) => new Date(valor).toLocaleDateString(),
+    },
+    {
+      clave: "fechaFin",
+      encabezado: "Fin",
+      render: (valor: string) => new Date(valor).toLocaleDateString(),
+    },
   ];
 
   return (
@@ -87,17 +86,6 @@ export default function usuariosPage() {
               router.push(`/usuarios/${usuarios.id}?edit=true`)
             }
             onEliminar={handleEliminar}
-            registrosPorPagina={10}
-            exportC={exportC}
-            mostrarImportar={true}
-            importUrl={`${process.env.NEXT_PUBLIC_API_URL}/usuarios`}
-            onImport={async () => {
-              const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/usuarios`
-              );
-              const nuevosDatos = await res.json();
-              setusuarios(nuevosDatos);
-            }}
           />
         )}
       </div>

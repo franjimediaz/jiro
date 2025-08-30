@@ -178,7 +178,7 @@ export default function ArbolPresupuesto({
   };
   const handleFacturaCreada = (idFactura: number) => {
     setMostrarModalFactura(false);
-    router.push(`/facturas/${idFactura}`);
+    router.push(`/obras/presupuestos/facturas/${idFactura}`);
   };
   if (cargando) return <p>Cargando estructura del presupuesto...</p>;
   if (!estructura.length) return <p>No hay datos disponibles.</p>;

@@ -56,12 +56,6 @@ export default function FacturasPage() {
       <div className={styles.FacturasContainer}>
         <div className={styles.header}>
           <h1>Listado de Facturas</h1>
-          <button
-            className={styles.botonCrear}
-            onClick={() => router.push("/Facturas/create")}
-          >
-            + Crear Factura
-          </button>
         </div>
 
         {loading ? (
@@ -76,6 +70,7 @@ export default function FacturasPage() {
               router.push(`/Facturas/${Facturas.id}?edit=true`)
             }
             onEliminar={handleEliminar}
+            mostrarImportar={false}
           />
         )}
       </div>

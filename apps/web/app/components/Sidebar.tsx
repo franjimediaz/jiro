@@ -1,9 +1,9 @@
-'use client';
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import styles from './Sidebar.module.css';
-import { useRouter } from 'next/navigation';
-import { obtenerModulosJerarquicos } from '../system/modulos/modulosService';
+"use client";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import styles from "./Sidebar.module.css";
+import { useRouter } from "next/navigation";
+import { obtenerModulosJerarquicos } from "../system/modulos/modulosService";
 
 const Sidebar = () => {
   const [modulos, setModulos] = useState<any[]>([]);
@@ -17,10 +17,16 @@ const Sidebar = () => {
     };
     cargar();
   }, []);
-  const handleLogout = () => {
-    // Aquí puedes limpiar cookies, localStorage o llamar a una API de logout
-    localStorage.removeItem('token'); // ejemplo
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
+    router.push("/login");
   };
   const asignarPadres = (lista: any[], padre: any = null): any[] =>
     lista.map((modulo) => {
@@ -32,24 +38,27 @@ const Sidebar = () => {
     });
 
   const irHacia = (modulo: any) => {
-  if (modulo.ruta) {
-    router.push(modulo.ruta); // Siempre navega a la ruta
-  }
-  if (modulo.hijos?.length) {
-    setModuloActivo(modulo); 
-  }
-};
+    if (modulo.ruta) {
+      router.push(modulo.ruta); // Siempre navega a la ruta
+    }
+    if (modulo.hijos?.length) {
+      setModuloActivo(modulo);
+    }
+  };
 
   const listaActual = moduloActivo ? moduloActivo.hijos : modulos;
 
   return (
     <aside className={styles.sidebar}>
       <Link href="/dashboard" className={styles.title}>
-      <h2>JiRo</h2>
+        <h2>JiRo</h2>
       </Link>
       <nav className={styles.nav}>
         {moduloActivo && (
-          <button className={styles.volver} onClick={() => setModuloActivo(moduloActivo.padre)}>
+          <button
+            className={styles.volver}
+            onClick={() => setModuloActivo(moduloActivo.padre)}
+          >
             ←
           </button>
         )}

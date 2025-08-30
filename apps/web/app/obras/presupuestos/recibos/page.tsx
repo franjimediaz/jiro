@@ -55,12 +55,6 @@ export default function RecibosPage() {
       <div className={styles.RecibosContainer}>
         <div className={styles.header}>
           <h1>Listado de Recibos</h1>
-          <button
-            className={styles.botonCrear}
-            onClick={() => router.push("/Recibos/create")}
-          >
-            + Crear Recibo
-          </button>
         </div>
 
         {loading ? (
@@ -75,6 +69,7 @@ export default function RecibosPage() {
               router.push(`/Recibos/${Recibos.id}?edit=true`)
             }
             onEliminar={handleEliminar}
+            mostrarImportar={false}
           />
         )}
       </div>

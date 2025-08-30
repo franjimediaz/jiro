@@ -1,10 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import TablaListado from '../components/TablaListado';
-import styles from './clientes.module.css'; 
-import { useRouter } from 'next/navigation';
-
+import { useEffect, useState } from "react";
+import TablaListado from "../components/TablaListado";
+import styles from "./clientes.module.css";
+import { useRouter } from "next/navigation";
 
 type Clientes = {
   id: number;
@@ -20,45 +19,52 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter(); // ← Aquí
 
-useEffect(() => {
-  fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes`)
-    .then(res => res.json())
-    .then(data => {
-      console.log("Respuesta del backend:", data);
-      if (Array.isArray(data)) {
-        setClientes(data);
-      } else if (Array.isArray(data.clientes)) {
-        setClientes(data);
-      } else {
-        console.error(" Los datos no son un array:", data);
-      }
-      setLoading(false);
-    })
-    .catch(err => {
-      console.error('Error al obtener clientes:', err);
-      setLoading(false);
-    });
-}, []);
-
-
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes`)
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Respuesta del backend:", data);
+        if (Array.isArray(data)) {
+          setClientes(data);
+        } else if (Array.isArray(data.clientes)) {
+          setClientes(data);
+        } else {
+          console.error(" Los datos no son un array:", data);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error al obtener clientes:", err);
+        setLoading(false);
+      });
+  }, []);
 
   const handleEliminar = (clientes: any) => {
     if (confirm(`¿Eliminar clientes "${clientes.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes/${clientes.id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       })
         .then(() => {
           setClientes((prev) => prev.filter((o) => o.id !== clientes.id));
-          alert('cliente eliminado');
+          alert("cliente eliminado");
         })
-        .catch(() => alert('Error al eliminar'));
+        .catch(() => alert("Error al eliminar"));
     }
   };
 
   const columnas = [
-    { clave: 'nombre', encabezado: 'Nombre' },
-    { clave: 'direccion', encabezado: 'Dirección' },
-    { clave: 'email', encabezado: 'Email' },
+    { clave: "nombre", encabezado: "Nombre" },
+    { clave: "direccion", encabezado: "Dirección" },
+    { clave: "email", encabezado: "Email" },
+  ];
+  const exportC = [
+    { clave: "id", encabezado: "ID" },
+    { clave: "nombre", encabezado: "Nombre" },
+    { clave: "apellido", encabezado: "Apellido" },
+    { clave: "email", encabezado: "Email" },
+    { clave: "dni", encabezado: "DNI" },
+    { clave: "direccion", encabezado: "Dirección" },
+    { clave: "telefono", encabezado: "Teléfono" },
   ];
 
   return (
@@ -68,7 +74,7 @@ useEffect(() => {
           <h1>Listado de clientes</h1>
           <button
             className={styles.botonCrear}
-            onClick={() => router.push('/clientes/create')}
+            onClick={() => router.push("/clientes/create")}
           >
             + Crear clientes
           </button>
@@ -82,12 +88,24 @@ useEffect(() => {
             columnas={columnas}
             datos={clientes}
             onVer={(clientes) => router.push(`/clientes/${clientes.id}`)}
-            onEditar={(clientes) => router.push(`/clientes/${clientes.id}?edit=true`)}
+            onEditar={(clientes) =>
+              router.push(`/clientes/${clientes.id}?edit=true`)
+            }
             onEliminar={handleEliminar}
+            registrosPorPagina={10}
+            exportC={exportC}
+            mostrarImportar={true}
+            importUrl={`${process.env.NEXT_PUBLIC_API_URL}/clientes`}
+            onImport={async () => {
+              const res = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/clientes`
+              );
+              const nuevosDatos = await res.json();
+              setClientes(nuevosDatos);
+            }}
           />
         )}
       </div>
     </main>
   );
 }
-

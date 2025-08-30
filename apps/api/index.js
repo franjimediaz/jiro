@@ -1042,7 +1042,7 @@ app.post("/facturas", async (req, res) => {
     const facturasExistentes = await prisma.facturas.findMany({
       where: { presupuestoId },
     });
-    const nuevaReferencia = `F-${presupuestoId}-${facturasExistentes.length + 1}`;
+    const nuevaReferencia = `FAC-${presupuestoId}P-${facturasExistentes.length + 1}`;
 
     // Filtrar solo IDs válidos
     const existentes = servicioIds?.length
@@ -1127,7 +1127,14 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });
-
+app.post("/logout", (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax", // usa "strict" si puedes
+  });
+  res.json({ success: true });
+});
 //////////////////////////////////////////////////////////
 //  PUT
 //////////////////////////////////////////////////////////
@@ -1341,6 +1348,25 @@ app.put("/presupuestos/:id", async (req, res) => {
   } catch (error) {
     console.error("❌ Error al actualizar presupuesto:", error);
     res.status(500).json({ error: "Error al actualizar presupuesto" });
+  }
+});
+app.put("/materiales/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { nombre } = req.body;
+
+  if (!nombre) {
+    return res.status(400).json({ error: "Faltan campos obligatorios" });
+  }
+
+  try {
+    const materialActualizado = await prisma.materiales.update({
+      where: { id },
+      data: { nombre, stockActual, precio },
+    });
+    res.json(materialActualizado);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al actualizar material" });
   }
 });
 

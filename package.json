@@ -9,6 +9,7 @@
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
+    "@types/papaparse": "^5.3.16",
     "prettier": "^3.5.3",
     "tsx": "^4.20.3",
     "turbo": "^2.5.4",
@@ -32,11 +33,13 @@
     "@tiptap/starter-kit": "^2.25.0",
     "cookie": "^1.0.2",
     "cookie-parser": "^1.4.7",
+    "date-fns": "^4.1.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.516.0",
     "multer": "^2.0.1",
+    "papaparse": "^5.5.3",
     "quill": "^2.0.3",
     "react-quill": "^2.0.0"
   }

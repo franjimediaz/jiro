@@ -1,10 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import TablaListado from '../../components/TablaListado';
-import styles from './Presupuestos.module.css'; // o donde tengas el CSS
-import { useRouter } from 'next/navigation';
-
+import { useEffect, useState } from "react";
+import TablaListado from "../../components/TablaListado";
+import styles from "./Presupuestos.module.css";
+import { useRouter } from "next/navigation";
 
 type Presupuesto = {
   id: number;
@@ -13,6 +12,14 @@ type Presupuesto = {
   fechaInicio: string;
   fechaFin: string;
   estado: string;
+  aceptado: boolean;
+  importe: number;
+};
+type Columna = {
+  clave: string;
+  encabezado: string;
+  tipo?: "texto" | "checkbox";
+  render?: (valor: any, fila: any) => React.ReactNode;
 };
 
 export default function PresupuestosPage() {
@@ -22,34 +29,39 @@ export default function PresupuestosPage() {
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/Presupuestos`)
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         setPresupuestos(data);
         setLoading(false);
       })
-      .catch(err => {
-        console.error('Error al obtener Presupuestos:', err);
+      .catch((err) => {
+        console.error("Error al obtener Presupuestos:", err);
         setLoading(false);
       });
   }, []);
 
   const handleEliminar = (Presupuesto: any) => {
     if (confirm(`¿Eliminar Presupuesto "${Presupuesto.nombre}"?`)) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/Presupuestos/${Presupuesto.id}`, {
-        method: 'DELETE',
-      })
+      fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/Presupuestos/${Presupuesto.id}`,
+        {
+          method: "DELETE",
+        }
+      )
         .then(() => {
-          setPresupuestos((prev) => prev.filter((o) => o.id !== Presupuesto.id));
-          alert('Presupuesto eliminada');
+          setPresupuestos((prev) =>
+            prev.filter((o) => o.id !== Presupuesto.id)
+          );
+          alert("Presupuesto eliminada");
         })
-        .catch(() => alert('Error al eliminar'));
+        .catch(() => alert("Error al eliminar"));
     }
   };
 
-  const columnas = [
-    { clave: 'nombre', encabezado: 'Nombre' },
-    {clave: 'aceptado',encabezado: 'Aceptado',},
-    {clave: 'importe',encabezado: 'Importe',},
+  const columnas: Columna[] = [
+    { clave: "nombre", encabezado: "Nombre", tipo: "texto" },
+    { clave: "aceptado", encabezado: "Aceptado", tipo: "checkbox" },
+    { clave: "importe", encabezado: "Importe", tipo: "texto" },
   ];
 
   return (
@@ -66,13 +78,17 @@ export default function PresupuestosPage() {
             titulo=""
             columnas={columnas}
             datos={Presupuestos}
-            onVer={(Presupuestos) => router.push(`presupuestos/${Presupuestos.id}`)}
-            onEditar={(Presupuestos) => router.push(`presupuestos/${Presupuestos.id}?edit=true`)}
+            onVer={(Presupuestos) =>
+              router.push(`presupuestos/${Presupuestos.id}`)
+            }
+            onEditar={(Presupuestos) =>
+              router.push(`presupuestos/${Presupuestos.id}?edit=true`)
+            }
             onEliminar={handleEliminar}
+            mostrarImportar={false}
           />
         )}
       </div>
     </main>
   );
 }
-
