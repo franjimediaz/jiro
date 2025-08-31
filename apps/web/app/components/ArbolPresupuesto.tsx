@@ -189,7 +189,10 @@ export default function ArbolPresupuesto({
 
       {estructura.map((servicio, idx) => {
         const claveServicio = `servicio-${idx}`;
-        const abiertoServicio = abiertos[claveServicio] ?? true;
+        const abiertoServicio = abiertos[claveServicio] ?? false;
+        const totalServicio = servicio.tareas.reduce((acc, tarea) => {
+          return acc + (tarea.total ?? 0);
+        }, 0);
 
         return (
           <div key={claveServicio} className={styles.nodo}>
@@ -197,13 +200,14 @@ export default function ArbolPresupuesto({
               className={`${styles.toggle} ${abiertoServicio ? styles.abierto : ""}`}
               onClick={() => toggleNodo(claveServicio)}
             >
-              {servicio.servicioNombre || "Servicio sin nombre"}
+              {servicio.servicioNombre || "Servicio sin nombre"}:{" "}
+              {totalServicio.toFixed(2)} €
             </div>
             {abiertoServicio && (
               <div>
                 {servicio.tareas.map((tarea, tIdx) => {
                   const claveTarea = `${claveServicio}-tarea-${tIdx}`;
-                  const abiertoTarea = abiertos[claveTarea] ?? true;
+                  const abiertoTarea = abiertos[claveTarea] ?? false;
 
                   return (
                     <div key={claveTarea} className={styles.nodo}>
@@ -212,14 +216,17 @@ export default function ArbolPresupuesto({
                         onClick={() => toggleNodo(claveTarea)}
                       >
                         {tarea.nombre || "Tarea sin descripción"} —{" "}
-                        <strong>{(tarea.total ?? 0).toFixed(2)} €</strong>
+                        <strong>
+                          {tarea.cantidad ?? 0} x{" "}
+                          {(tarea.precioManoObra ?? 0).toFixed(2)} €
+                        </strong>
                       </div>
                       {abiertoTarea && (
                         <div>
                           {tarea.materiales.map((material, mIdx) => (
                             <div key={mIdx} className={styles.material}>
                               {material.nombre || "Material sin nombre"}:{" "}
-                              {material.cantidad ?? 0} x{" "}
+                              {material.cantidad ?? 0} x
                               {(material.precioUnidad ?? 0).toFixed(2)} €
                             </div>
                           ))}

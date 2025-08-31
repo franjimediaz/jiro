@@ -10,9 +10,9 @@ export interface MaterialPresupuesto {
 export interface TareaPresupuesto {
   nombre: string;
   descripcion: string;
-  precioManoObra: number,
+  precioManoObra: number;
   total: number;
-  cantidad :number;
+  cantidad: number;
   materiales: MaterialPresupuesto[];
 }
 
@@ -36,6 +36,7 @@ export interface ClienteInfo {
   direccion: string;
   telefono?: string;
   email?: string;
+  dni?: string;
 }
 
 export interface EmpresaBranding {

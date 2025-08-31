@@ -158,8 +158,6 @@ export default function VerEditarObra() {
         botonTexto="Guardar cambios"
         soloLectura={!modoEdicion}
       />
-
-      {!cargando && id && <TreeViewServiciosTareas obraId={Number(id)} />}
       {!cargando && valores.clienteId && (
         <div className="alineado-boton">
           <CrearPresupuestoBtn
@@ -188,6 +186,7 @@ export default function VerEditarObra() {
         mostrarImportar={false}
         registrosPorPagina={1}
       />
+      {!cargando && id && <TreeViewServiciosTareas obraId={Number(id)} />}
     </div>
   );
 }

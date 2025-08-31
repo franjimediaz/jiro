@@ -14,11 +14,16 @@ const loginRouter = require("./routes/login");
 const cookieParser = require("cookie-parser");
 const PORT = process.env.PORT || 3001;
 const frontendURL = "http://localhost:3002";
+const allowedOrigins = [
+  "http://localhost:3002",
+  "http://localhost:3001",
+  "http://dominio.com",
+];
 
 app.use(cookieParser());
 app.use(
   cors({
-    origin: frontendURL,
+    origin: allowedOrigins,
     credentials: true, // ⬅️ IMPORTANTE para usar cookies
   })
 );
@@ -552,6 +557,113 @@ app.get("/facturas", async (req, res) => {
     res.status(500).json({ error: "Error al obtener facturas" });
   }
 });
+
+app.get("/obras/count", async (req, res) => {
+  try {
+    const total = await prisma.obra.count();
+    res.json({ count: total });
+  } catch (error) {
+    console.error("Error al contar obras:", error);
+    res.status(500).json({ error: "Error al contar obras" });
+  }
+});
+app.get("/directorios", async (req, res) => {
+  try {
+    const directorios = await prisma.directorios.findMany();
+    res.json(directorios);
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener directorios" });
+  }
+});
+app.get("/directorios/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    console.log("🧪 Buscando directorios con ID:", id);
+    const directorio = await prisma.directorios.findUnique({ where: { id } });
+
+    if (!directorio)
+      return res.status(404).json({ error: "Directorio no encontrado" });
+
+    res.json(directorio);
+  } catch (error) {
+    console.error("❌ Error exacto:", error);
+    res.status(500).json({ error: "Error al obtener Directorio" });
+  }
+});
+
+// GET /kpis/obras
+app.get("/kpis/obras", async (req, res) => {
+  try {
+    const [
+      totalObras,
+      obrasActivas,
+      tareasHoy,
+      tareasSemana,
+      obrasPorEstado,
+      obrasPorMes,
+      avanceMedio,
+      importeTotalPresupuestado,
+    ] = await Promise.all([
+      prisma.obra.count(),
+      prisma.obra.count({
+        where: { estado: { notIn: ["Finalizada", "Cerrada"] } },
+      }),
+      prisma.tarea.count({
+        where: {
+          estado: { notIn: ["Completada", "Cancelada"] },
+          fechaInicio: { lte: new Date() },
+          fechaFin: { gte: new Date() },
+        },
+      }),
+      (async () => {
+        const hoy = new Date();
+        const end = new Date(hoy);
+        // domingo de esta semana (o +7 días)
+        end.setDate(hoy.getDate() + (7 - hoy.getDay()));
+        return prisma.tarea.count({
+          where: {
+            estado: { notIn: ["Completada", "Cancelada"] },
+            fechaInicio: { gte: hoy, lte: end },
+          },
+        });
+      })(),
+      prisma.obra.groupBy({ by: ["estado"], _count: { _all: true } }),
+      prisma.$queryRaw`
+        SELECT to_char(date_trunc('month',"createdAt"), 'YYYY-MM') as mes, COUNT(*)::int as total
+        FROM "Obra"
+        WHERE "createdAt" >= (CURRENT_DATE - INTERVAL '12 months')
+        GROUP BY 1 ORDER BY 1 ASC;
+      `,
+      prisma.$queryRaw`SELECT COALESCE(AVG("avance"::numeric),0)::float as promedio FROM "Obra";`,
+      prisma.$queryRaw`SELECT COALESCE(SUM("importe"::numeric),0)::float as total FROM "Presupuesto";`,
+    ]);
+
+    res.json({
+      totalObras,
+      obrasActivas,
+      tareasPendientesHoy: tareasHoy,
+      tareasPendientesSemana: tareasSemana,
+      obrasPorEstado: obrasPorEstado.map((o) => ({
+        estado: o.estado,
+        total: o._count._all,
+      })),
+      obrasPorMes,
+      avanceMedio: Number(avanceMedio?.[0]?.promedio ?? 0),
+      importeTotalPresupuestado: Number(
+        importeTotalPresupuestado?.[0]?.total ?? 0
+      ),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Error calculando KPIs" });
+  }
+});
+
 // Eliminar una obra
 
 //////////////////////////////////////////////////////////
@@ -599,8 +711,31 @@ app.post("/obras", async (req, res) => {
   }
 });
 
+app.post("/estados", async (req, res) => {
+  try {
+    const { nombre, color, icono } = req.body;
+
+    if (!nombre || !color || !icono) {
+      return res.status(400).json({ error: "Faltan campos obligatorios." });
+    }
+
+    const nuevoEstado = await prisma.estados.create({
+      data: {
+        nombre,
+        color,
+        icono,
+      },
+    });
+
+    res.status(201).json(nuevoEstado);
+  } catch (error) {
+    console.error("Error al crear estado:", error);
+    res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+
 app.post("/clientes", async (req, res) => {
-  const { nombre, apellido, direccion, email, telefono } = req.body;
+  const { nombre, apellido, direccion, email, telefono, dni } = req.body;
 
   if (!nombre || !apellido || !direccion || !email || !telefono) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
@@ -614,6 +749,7 @@ app.post("/clientes", async (req, res) => {
         direccion,
         email,
         telefono,
+        dni,
       },
     });
     res.status(201).json(nuevoCliente);
@@ -1030,6 +1166,115 @@ app.post("/usuarios", async (req, res) => {
     res.status(500).json({ error: "Error al crear usuario" });
   }
 });
+app.post("/directorios", async (req, res) => {
+  const {
+    id,
+    tipo,
+    estado,
+    nombre,
+    apellidos,
+    displayName,
+    dni,
+    email,
+    emailPersonal,
+    telefono,
+    telefono2,
+    fotoUrl,
+    puesto,
+    departamentoId,
+    departamento,
+    supervisorId,
+    supervisor,
+    subordinados,
+    rol,
+    jornada,
+    turno,
+    empresaExternaId,
+    empresaExterna,
+    usuarioId,
+    calendarEmail,
+    costeHora,
+    tarifaFacturacionHora,
+    moneda,
+    capacidadSemanalHoras,
+    tienePRL,
+    prlVencimiento,
+    rcVigente,
+    rcVencimiento,
+    ubicacionCiudad,
+    ubicacionProvincia,
+    ubicacionPais,
+    fechaAlta,
+    fechaBaja,
+    observaciones,
+    tags,
+  } = req.body;
+
+  if (!email || !password || !nombre) {
+    return res.status(400).json({ error: "Faltan campos obligatorios" });
+  }
+
+  try {
+    const existente = await prisma.directorio.findUnique({ where: { email } });
+    if (existente)
+      return res
+        .status(400)
+        .json({ error: "Ya existe un directorio con ese email" });
+
+    const nuevoDirectorio = await prisma.directorio.create({
+      data: {
+        id,
+        tipo,
+        estado,
+        nombre,
+        apellidos,
+        displayName,
+        dni,
+        email,
+        emailPersonal,
+        telefono,
+        telefono2,
+        fotoUrl,
+        puesto,
+        departamentoId,
+        departamento,
+        supervisorId,
+        supervisor,
+        subordinados,
+        rol,
+        jornada,
+        turno,
+        empresaExternaId,
+        empresaExterna,
+        usuarioId,
+        calendarEmail,
+        costeHora,
+        tarifaFacturacionHora,
+        moneda,
+        capacidadSemanalHoras,
+        tienePRL,
+        prlVencimiento,
+        rcVigente,
+        rcVencimiento,
+        ubicacionCiudad,
+        ubicacionProvincia,
+        ubicacionPais,
+        fechaAlta,
+        fechaBaja,
+        observaciones,
+        tags,
+      },
+    });
+
+    res.status(201).json({
+      mensaje: "Directorio creado con éxito",
+      directorio: { id: nuevoDirectorio.id, email: nuevoDirectorio.email },
+    });
+  } catch (error) {
+    console.error("Error creando directorio:", error);
+    res.status(500).json({ error: "Error al crear directorio" });
+  }
+});
 app.post("/facturas", async (req, res) => {
   const { presupuestoId, cantidad, servicioIds } = req.body;
 
@@ -1140,16 +1385,16 @@ app.post("/logout", (req, res) => {
 //////////////////////////////////////////////////////////
 app.put("/clientes/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { nombre, apellido, direccion, email, telefono } = req.body;
+  const { nombre, apellido, direccion, email, telefono, dni } = req.body;
 
-  if (!nombre || !apellido || !direccion || !email || !telefono) {
+  if (!nombre || !apellido || !direccion || !email || !telefono || !dni) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
   }
 
   try {
     const clienteActualizado = await prisma.cliente.update({
       where: { id },
-      data: { nombre, apellido, direccion, email, telefono },
+      data: { nombre, apellido, direccion, email, telefono, dni },
     });
     res.json(clienteActualizado);
   } catch (error) {
@@ -1234,6 +1479,7 @@ app.put("/servicios_tarea/:id", async (req, res) => {
     precioManoObra,
     precioMateriales,
     cantidadMateriales,
+    costeResponsable,
     total,
   } = req.body;
 
@@ -1256,6 +1502,7 @@ app.put("/servicios_tarea/:id", async (req, res) => {
           ? parseFloat(cantidadMateriales)
           : 0,
         total: total ? parseFloat(total) : 0,
+        costeResponsable: costeResponsable || null,
       },
     });
 

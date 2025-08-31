@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "node index.js"
+    "dev": "node index.js",
+    "migrate": "prisma migrate deploy",
+    "migrate:dev": "prisma db push",
+    "generate": "prisma generate",
+    "studio": "prisma studio"
   },
   "keywords": [],
   "author": "",
@@ -13,7 +17,7 @@
     "prisma": "^6.12.0"
   },
   "dependencies": {
-    "@prisma/client": "^6.10.1",
+    "@prisma/client": "^6.12.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",

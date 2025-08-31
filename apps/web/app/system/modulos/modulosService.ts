@@ -33,7 +33,40 @@ export const modulosIniciales = [
     nombre: "Usuarios",
     ruta: "/usuarios",
     orden: 2,
-    hijos: [{ nombre: "Roles", ruta: "/usuarios/roles", orden: 1, hijos: [] }],
+    hijos: [
+      { nombre: "Roles", ruta: "/usuarios/roles", orden: 1, hijos: [] },
+      {
+        nombre: "Directorio Empleados",
+        ruta: "/usuarios/directorios",
+        orden: 2,
+        hijos: [],
+      },
+      {
+        nombre: "Directorio Empresas",
+        ruta: "/usuarios/directoriosEmp",
+        orden: 2,
+        hijos: [],
+      },
+      {
+        nombre: "Configuración",
+        ruta: "/usuarios/config",
+        orden: 2,
+        hijos: [
+          {
+            nombre: "Tipos de Empleado",
+            ruta: "/usuarios/config/TiposEmp",
+            orden: 2,
+            hijos: [],
+          },
+          {
+            nombre: "Departamentos",
+            ruta: "/usuarios/config/Departamentos",
+            orden: 2,
+            hijos: [],
+          },
+        ],
+      },
+    ],
   },
   {
     nombre: "Clientes",

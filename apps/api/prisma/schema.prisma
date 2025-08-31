@@ -10,6 +10,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
 // ------------------------------------------------------------------OBRAS -----------------------------------------------------------------------
 model Obra {
   id             Int               @id @default(autoincrement())
@@ -38,7 +39,7 @@ model Cliente {
   obras     Obra[]
   Presupuestos Presupuesto[]
 }
-
+//-----------------------------------------------------Usuario
 model Usuario {
   id       Int               @id @default(autoincrement())
   idUsuario String        @unique
@@ -52,6 +53,84 @@ model Usuario {
   activo   Boolean @default(true)
 }
 
+
+model Directorios {
+  id                      String         @id @default(cuid())
+  tipo                    String?
+  estado                  Boolean?
+
+  nombre                  String
+  apellidos               String
+  displayName             String?
+  dni                     String?        @unique
+  email                   String         @unique
+  emailPersonal           String?
+  telefono                String?
+  telefono2               String?
+  fotoUrl                 String?
+
+  puesto                  String?
+  departamentoId          String?
+  departamento            Departamento?  @relation(fields: [departamentoId], references: [id])
+  supervisorId            String?
+  supervisor              Directorios? @relation("SupervisorSubordinado", fields: [supervisorId], references: [id])
+  subordinados            Directorios[] @relation("SupervisorSubordinado")
+
+  rol                     String?           
+  jornada                 String?        // "completa" | "parcial" | "por_horas"
+  turno                   String?        // "mañana" | "tarde" | "noche"
+
+  empresaExternaId        String?
+  empresaExterna          EmpresaExterna? @relation(fields: [empresaExternaId], references: [id])
+
+  usuarioId               String?        // FK a tu tabla de usuarios si procede
+  calendarEmail           String?
+
+  costeHora               Decimal?       @db.Decimal(12,2)
+  tarifaFacturacionHora   Decimal?       @db.Decimal(12,2)
+  moneda                  String?        @default("EUR")
+  capacidadSemanalHoras   Int?
+
+  tienePRL                Boolean        @default(false)
+  prlVencimiento          DateTime?
+  rcVigente               Boolean        @default(false)
+  rcVencimiento           DateTime?
+
+  ubicacionCiudad         String?
+  ubicacionProvincia      String?
+  ubicacionPais           String?
+
+  fechaAlta               DateTime       @default(now())
+  fechaBaja               DateTime?
+  observaciones           String?
+  tags                    String[]       @db.Text
+
+
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  @@index([tipo, estado])
+  @@index([departamentoId])
+  @@index([empresaExternaId])
+}
+
+model Departamento {
+  id        String     @id @default(cuid())
+  nombre    String     @unique
+  directorios Directorios[]
+}
+
+model EmpresaExterna {
+  id        String     @id @default(cuid())
+  nombre    String
+  cif       String?
+  email     String?
+  telefono  String?
+  direccion String?
+  directorios Directorios[]
+}
+
+//----------------------------------------------------
 model Tareas {
   id             Int               @id @default(autoincrement())
   nombre         String
@@ -175,6 +254,7 @@ model Servicios_Tarea {
   cantidadMateriales Float?                      // Opcional
   precioMateriales  Float?                       // Opcional
   total             Float? 
+  costeResponsable  Json? 
 
   obra              Obra       @relation(fields: [obraId], references: [id])
   servicio          Servicios   @relation(fields: [servicioId], references: [id])
