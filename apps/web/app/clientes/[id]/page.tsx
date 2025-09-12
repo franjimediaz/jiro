@@ -30,7 +30,9 @@ export default function VerEditarCliente() {
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes/${id}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes/${id}`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         setValores(data);
@@ -51,6 +53,7 @@ export default function VerEditarCliente() {
       `${process.env.NEXT_PUBLIC_API_URL}/clientes/${id}`,
       {
         method: "PUT",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(valores),
       }

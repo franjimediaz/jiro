@@ -20,7 +20,9 @@ export default function RecibosPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/Recibos`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/Recibos`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         setRecibos(data);
@@ -36,6 +38,7 @@ export default function RecibosPage() {
     if (confirm(`¿Eliminar Recibo "${Recibo.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/Recibos/${Recibo.id}`, {
         method: "DELETE",
+        credentials: "include",
       })
         .then(() => {
           setRecibos((prev) => prev.filter((o) => o.id !== Recibo.id));

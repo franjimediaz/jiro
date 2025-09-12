@@ -12,37 +12,141 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  justify-content: space-between;
+  min-width: 160px;
+  transition: all 0.2s ease;
 }
 
+.boton:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.flecha {
+  font-size: 0.8rem;
+  color: #6b7280;
+  transition: transform 0.2s ease;
+}
+
+/* ✅ Overlay mejorado */
+.overlay {
+  backdrop-filter: blur(2px);
+}
+
+/* ✅ Popup mejorado - aparece al lado */
 .popup {
-  position: absolute;
-  z-index: 100;
-  top: calc(100% + 6px);
-  left: 0;
-  width: 300px;
-  max-height: 200px;
-  overflow-y: scroll;
-  background: white;
-  border: 1px solid #e5e7eb;
+  /* Estilos que NO van inline */
   border-radius: 12px;
-  padding: 1rem;
-  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 0.5rem;
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.15),
+    0 8px 25px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
+  animation: slideIn 0.2s ease-out;
 }
 
+/* ✅ Animación de entrada */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ✅ Grid de iconos mejorado */
+.iconGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+/* ✅ Iconos individuales */
 .icono {
-  text-align: center;
-  cursor: pointer;
-  font-size: 0.75rem;
-  color: #1a202c;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  text-align: center;
 }
 
 .icono:hover {
-  background-color: #edf2f7;
-  border-radius: 8px;
+  background-color: #f3f4f6 !important;
+  border-color: #d1d5db !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.icono:active {
+  transform: translateY(0);
+  background-color: #e5e7eb !important;
+}
+
+/* ✅ Texto del icono */
+.iconoNombre {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: capitalize;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ✅ Estado abierto del botón */
+.wrapper.abierto .boton {
+  border-color: #6366f1;
+  background: #f8fafc;
+  box-shadow:
+    0 0 0 2px rgba(99, 102, 241, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.wrapper.abierto .flecha {
+  transform: rotate(180deg);
+  color: #6366f1;
+}
+
+/* ✅ Scrollbar personalizada */
+.popup::-webkit-scrollbar {
+  width: 6px;
+}
+
+.popup::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 3px;
+}
+
+.popup::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.popup::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ✅ Responsivo */
+@media (max-width: 768px) {
+  .popup {
+    width: 280px !important;
+  }
+
+  .iconGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .boton {
+    min-width: 140px;
+  }
 }

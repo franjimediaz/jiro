@@ -20,7 +20,9 @@ export default function ClientesPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         console.log("Respuesta del backend:", data);
@@ -43,6 +45,7 @@ export default function ClientesPage() {
     if (confirm(`¿Eliminar clientes "${clientes.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes/${clientes.id}`, {
         method: "DELETE",
+        credentials: "include",
       })
         .then(() => {
           setClientes((prev) => prev.filter((o) => o.id !== clientes.id));
@@ -98,7 +101,10 @@ export default function ClientesPage() {
             importUrl={`${process.env.NEXT_PUBLIC_API_URL}/clientes`}
             onImport={async () => {
               const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/clientes`
+                `${process.env.NEXT_PUBLIC_API_URL}/clientes`,
+                {
+                  credentials: "include",
+                }
               );
               const nuevosDatos = await res.json();
               setClientes(nuevosDatos);

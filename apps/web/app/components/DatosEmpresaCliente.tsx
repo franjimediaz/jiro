@@ -12,7 +12,9 @@ export default function DatosEmpresaCliente({ clienteId }: Props) {
 
   useEffect(() => {
     // Obtener datos del cliente
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes/${clienteId}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes/${clienteId}`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => setCliente(data))
       .catch((err) => console.error("Error al cargar cliente", err));
@@ -20,7 +22,9 @@ export default function DatosEmpresaCliente({ clienteId }: Props) {
 
   useEffect(() => {
     // Obtener datos de empresa (branding)
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/branding`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/branding`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => setBranding(data))
       .catch((err) => console.error("Error al cargar branding", err));
@@ -36,7 +40,7 @@ export default function DatosEmpresaCliente({ clienteId }: Props) {
           <strong>Nombre:</strong> {branding.nombre}
         </p>
         <p>
-          <strong>CIF:</strong> {branding.cif}
+          <strong>CIF:</strong> {branding.CIF}
         </p>
         <p>
           <strong>Dirección:</strong> {branding.direccion}

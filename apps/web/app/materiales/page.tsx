@@ -20,7 +20,9 @@ export default function materialesPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/materiales`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/materiales`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         setmateriales(data);
@@ -36,6 +38,7 @@ export default function materialesPage() {
     if (confirm(`¿Eliminar material "${material.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/materiales/${material.id}`, {
         method: "DELETE",
+        credentials: "include",
       })
         .then(() => {
           setmateriales((prev) => prev.filter((o) => o.id !== material.id));
@@ -91,7 +94,10 @@ export default function materialesPage() {
             importUrl={`${process.env.NEXT_PUBLIC_API_URL}/materiales`}
             onImport={async () => {
               const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/materiales`
+                `${process.env.NEXT_PUBLIC_API_URL}/materiales`,
+                {
+                  credentials: "include",
+                }
               );
               const nuevosDatos = await res.json();
               setmateriales(nuevosDatos);

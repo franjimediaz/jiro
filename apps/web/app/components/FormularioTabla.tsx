@@ -121,7 +121,8 @@ const FormularioTabla: React.FC<Props> = ({
         ) {
           try {
             const res = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL}/${campo.tabla}`
+              `${process.env.NEXT_PUBLIC_API_URL}/${campo.tabla}`,
+              { credentials: "include" }
             );
             const data = await res.json();
 
@@ -176,6 +177,7 @@ const FormularioTabla: React.FC<Props> = ({
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
 
@@ -187,6 +189,7 @@ const FormularioTabla: React.FC<Props> = ({
         if (campo.documento && tabla && registroId) {
           await fetch(`${process.env.NEXT_PUBLIC_API_URL}/documentos`, {
             method: "POST",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               nombre: archivo.name,
@@ -224,6 +227,7 @@ const FormularioTabla: React.FC<Props> = ({
               method: "DELETE",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ url: valores[campo.nombre] }),
+              credentials: "include",
             }
           );
 

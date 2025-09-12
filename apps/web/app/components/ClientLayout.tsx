@@ -3,16 +3,21 @@
 //<main style={{ marginLeft: mostrarSidebar ? 220 : 0, padding: '2rem' }}>
 //        {children}
 //      </main>
-'use client'
+"use client";
 
-import { usePathname } from 'next/navigation';
-import Sidebar from './Sidebar';
-import React from 'react';
+import { usePathname } from "next/navigation";
+import Sidebar from "./Sidebar";
+import React from "react";
+import { PermisosProvider } from "../lib/permisos";
 
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
+export default function ClientLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
-  const rutasSinSidebar = ['/login', '/register', '/reset-password'];
-  const esLogin = pathname === '/login';
+  const rutasSinSidebar = ["/login", "/register", "/reset-password"];
+  const esLogin = pathname === "/login";
 
   const mostrarSidebar = !rutasSinSidebar.includes(pathname);
 
@@ -20,14 +25,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     <>
       {mostrarSidebar && <Sidebar />}
       <main
-          style={{
-            marginLeft: mostrarSidebar && !esLogin ? 220 : 0,
-            padding: !esLogin ? '2rem' : 0,
-          }}
-            >
-      {children}
-    
-    </main>
+        style={{
+          marginLeft: mostrarSidebar && !esLogin ? 220 : 0,
+          padding: !esLogin ? "2rem" : 0,
+        }}
+      >
+        <PermisosProvider>{children}</PermisosProvider>
+      </main>
     </>
   );
 }

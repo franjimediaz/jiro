@@ -37,7 +37,10 @@ const TreeViewServiciosTareas: React.FC<Props> = ({ obraId }) => {
     const cargar = async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/obras/${obraId}/servicios-tareas`
+          `${process.env.NEXT_PUBLIC_API_URL}/obras/${obraId}/servicios-tareas`,
+          {
+            credentials: "include",
+          }
         );
         const data = await res.json();
         setServicios(data);
@@ -71,6 +74,7 @@ const TreeViewServiciosTareas: React.FC<Props> = ({ obraId }) => {
         `${process.env.NEXT_PUBLIC_API_URL}/servicios/${servicioId}`,
         {
           method: "DELETE",
+          credentials: "include",
         }
       );
       setServicios((prev) => prev.filter((s) => s.id !== servicioId));
@@ -89,6 +93,7 @@ const TreeViewServiciosTareas: React.FC<Props> = ({ obraId }) => {
         `${process.env.NEXT_PUBLIC_API_URL}/obras/tareas/${tareaId}`,
         {
           method: "DELETE",
+          credentials: "include",
         }
       );
 
@@ -197,6 +202,9 @@ const TreeViewServiciosTareas: React.FC<Props> = ({ obraId }) => {
       </ul>
       <div className={styles.resumenTotal}>
         <strong>Total sin IVA:</strong> {totalGeneral.toFixed(2)} €
+      </div>
+      <div className={styles.resumenTotal}>
+        <strong>Total con IVA:</strong> {(totalGeneral * 1.21).toFixed(2)} €
       </div>
     </div>
   );

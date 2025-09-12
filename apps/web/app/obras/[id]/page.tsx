@@ -40,9 +40,14 @@ const campos = [
 ];
 
 const columnas: Columna[] = [
-  { clave: "descripción", encabezado: "Descripción", tipo: "texto" },
+  { clave: "nombre", encabezado: "Nombre", tipo: "texto" },
   { clave: "createdAt", encabezado: "Fecha", tipo: "texto" },
-  { clave: "importe", encabezado: "€", tipo: "texto" },
+  {
+    clave: "importe",
+    encabezado: "Importe",
+    tipo: "texto",
+    render: (valor: number) => `${valor?.toFixed(2) || "0.00"} €`,
+  },
   { clave: "aceptado", encabezado: "Aceptado", tipo: "checkbox" },
 ];
 
@@ -68,7 +73,9 @@ export default function VerEditarObra() {
   useEffect(() => {
     if (!id) return;
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/presupuestos/por-obra/${id}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/presupuestos/por-obra/${id}`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         console.log("✅ Datos presupuestos:", data);
@@ -86,7 +93,9 @@ export default function VerEditarObra() {
   }, [id]);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/Obras/${id}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/Obras/${id}`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         setValores(data);
@@ -113,6 +122,7 @@ export default function VerEditarObra() {
   const handleSubmit = async () => {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras/${id}`, {
       method: "PUT",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(valores),
     });
@@ -132,6 +142,7 @@ export default function VerEditarObra() {
         `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${id}`,
         {
           method: "DELETE",
+          credentials: "include",
         }
       );
       if (res.ok) {
@@ -173,7 +184,7 @@ export default function VerEditarObra() {
         </div>
       )}
       <TablaListado
-        titulo=""
+        titulo="Presupuestos vinculados"
         columnas={columnas}
         datos={presupuestos}
         onVer={(presupuesto) =>

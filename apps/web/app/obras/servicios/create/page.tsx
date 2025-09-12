@@ -1,21 +1,30 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import FormularioTabla from '../../../components/FormularioTabla';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import FormularioTabla from "../../../components/FormularioTabla";
 
 const campos = [
-  { nombre: 'nombre', etiqueta: 'Nombre del servicio', placeholder: 'Ej. Albañilería' },
-  { nombre: 'color', etiqueta: 'Color', placeholder: '#FFAA00', tipo: 'color' },
-  { nombre: 'icono', etiqueta: 'Icono', placeholder: 'fa-hammer', tipo: 'icono' },
+  {
+    nombre: "nombre",
+    etiqueta: "Nombre del servicio",
+    placeholder: "Ej. Albañilería",
+  },
+  { nombre: "color", etiqueta: "Color", placeholder: "#FFAA00", tipo: "color" },
+  {
+    nombre: "icono",
+    etiqueta: "Icono",
+    placeholder: "fa-hammer",
+    tipo: "icono",
+  },
 ];
 
 const CrearServicio = () => {
   const router = useRouter();
   const [valores, setValores] = useState({
-    nombre: '',
-    color: '',
-    icono: '',
+    nombre: "",
+    color: "",
+    icono: "",
   });
 
   const handleChange = (nombre: string, valor: any) => {
@@ -25,16 +34,17 @@ const CrearServicio = () => {
   const handleSubmit = async () => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(valores),
+        credentials: "include",
       });
 
-      if (!res.ok) throw new Error('Error al crear el servicio');
+      if (!res.ok) throw new Error("Error al crear el servicio");
 
       router.back(); // o router.push('/servicios') si tienes listado
     } catch (error) {
-      console.error('Error al crear servicio:', error);
+      console.error("Error al crear servicio:", error);
     }
   };
 

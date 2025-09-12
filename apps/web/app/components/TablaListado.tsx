@@ -214,6 +214,7 @@ const TablaListado: React.FC<Props> = ({
 
               const response = await fetch(url, {
                 method: metodo,
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(registro),
               });

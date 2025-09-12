@@ -1,8 +1,7 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import './TablaFractal.css';
-
+import React, { useState } from "react";
+import "./TablaFractal.css";
 
 type Columna = {
   clave: string;
@@ -32,42 +31,49 @@ const TablaFractal: React.FC<Props> = ({
   });
   const [nodosAbiertos, setNodosAbiertos] = useState<Set<number>>(new Set());
   const toggleNodo = (id: number) => {
-  setNodosAbiertos((prev) => {
-    const nuevo = new Set(prev);
-    if (nuevo.has(id)) {
-      nuevo.delete(id);
-    } else {
-      nuevo.add(id);
-    }
-    return nuevo;
-  });
-};
+    setNodosAbiertos((prev) => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(id)) {
+        nuevo.delete(id);
+      } else {
+        nuevo.add(id);
+      }
+      return nuevo;
+    });
+  };
 
   const renderFila = (fila: any, nivelActual: number) => (
-    <React.Fragment key={fila.id}>
+    <React.Fragment key={`fila-${fila.id}-nivel-${nivelActual}`}>
       <tr>
         {columnas.map((col, idx) => (
           <td key={col.clave}>
             <div style={idx === 0 ? indent(nivelActual) : undefined}>
-                {fila.hijos?.length > 0 && idx === 0 && (
-                    <span
-                    onClick={() => toggleNodo(fila.id)}
-                    style={{ cursor: 'pointer', marginRight: 6 }}
-                    >
-                    {nodosAbiertos.has(fila.id) ? '▼' : '▶'}
-                    </span>
-                )}
-                {col.render ? col.render(fila[col.clave], fila) : fila[col.clave]}
-                </div>
+              {fila.hijos?.length > 0 && idx === 0 && (
+                <span
+                  onClick={() => toggleNodo(fila.id)}
+                  style={{ cursor: "pointer", marginRight: 6 }}
+                >
+                  {nodosAbiertos.has(fila.id) ? "▼" : "▶"}
+                </span>
+              )}
+              {col.render ? col.render(fila[col.clave], fila) : fila[col.clave]}
+            </div>
           </td>
         ))}
         <td>
           <div className="tabla-acciones">
             {onEditar && (
-              <button className="btn btn-editar" onClick={() => onEditar(fila)}>✏️</button>
+              <button className="btn btn-editar" onClick={() => onEditar(fila)}>
+                ✏️
+              </button>
             )}
             {onEliminar && (
-              <button className="btn btn-eliminar" onClick={() => onEliminar(fila)}>🗑️</button>
+              <button
+                className="btn btn-eliminar"
+                onClick={() => onEliminar(fila)}
+              >
+                🗑️
+              </button>
             )}
           </div>
         </td>

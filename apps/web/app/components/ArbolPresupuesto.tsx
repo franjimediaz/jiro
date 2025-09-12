@@ -41,6 +41,7 @@ export default function ArbolPresupuesto({
         `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${presupuestoId}`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
@@ -65,13 +66,19 @@ export default function ArbolPresupuesto({
     const fetchDatosEmpresaYCliente = async () => {
       try {
         const resEmpresa = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/branding`
+          `${process.env.NEXT_PUBLIC_API_URL}/branding`,
+          {
+            credentials: "include",
+          }
         );
         const dataEmpresa = await resEmpresa.json();
         setEmpresa(dataEmpresa);
 
         const resCliente = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${presupuestoId}/cliente`
+          `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${presupuestoId}/cliente`,
+          {
+            credentials: "include",
+          }
         );
         const dataCliente = await resCliente.json();
         console.log("👀 Resultado directo del fetch de cliente:", dataCliente);
@@ -79,7 +86,10 @@ export default function ArbolPresupuesto({
         setCliente(dataCliente);
 
         const resPresupuesto = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${presupuestoId}`
+          `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${presupuestoId}`,
+          {
+            credentials: "include",
+          }
         );
         const dataPresupuesto = await resPresupuesto.json();
         setNombrePresupuesto(dataPresupuesto.nombre || "Presupuesto detallado");
@@ -98,7 +108,10 @@ export default function ArbolPresupuesto({
     const fetchArbol = async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${presupuestoId}/arbol`
+          `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${presupuestoId}/arbol`,
+          {
+            credentials: "include",
+          }
         );
         if (!res.ok)
           throw new Error("Error al cargar el árbol del presupuesto");

@@ -126,7 +126,7 @@ export default function NuevaTarea() {
     id: "",
     nombre: "",
     descripcion: "",
-    dirección: "",
+    direccion: "",
     estadoId: "",
     progreso: "",
     fechaInicio: "",
@@ -197,12 +197,14 @@ export default function NuevaTarea() {
     const cargarDatos = async () => {
       try {
         const tareaRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/tareas/${tareaIdUrl}`
+          `${process.env.NEXT_PUBLIC_API_URL}/tareas/${tareaIdUrl}`,
+          { credentials: "include" }
         );
         const tarea = await tareaRes.json();
 
         const stRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/servicios_tarea/por-tarea/${tareaIdUrl}`
+          `${process.env.NEXT_PUBLIC_API_URL}/servicios_tarea/por-tarea/${tareaIdUrl}`,
+          { credentials: "include" }
         );
         const servicioTarea = await stRes.json();
         setServicioTareaId(servicioTarea.id);
@@ -214,6 +216,7 @@ export default function NuevaTarea() {
           descripcion: tarea.descripcion || "",
           estadoId: tarea.estadoId || "",
           progreso: tarea.progreso || "",
+          dirección: tarea.direccion || "",
           fechaInicio: servicioTarea.fechaInicio?.substring(0, 10) || "",
           fechaFin: servicioTarea.fechaFin?.substring(0, 10) || "",
           servicioId: servicioTarea.servicioId || "",
@@ -242,7 +245,8 @@ export default function NuevaTarea() {
     const cargarMateriales = async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/st_material/por-servicio/${servicioTareaId}`
+          `${process.env.NEXT_PUBLIC_API_URL}/st_material/por-servicio/${servicioTareaId}`,
+          { credentials: "include" }
         );
         const data = await res.json();
         setMateriales(data);
@@ -300,12 +304,14 @@ export default function NuevaTarea() {
         `${process.env.NEXT_PUBLIC_API_URL}/tareas/${valores.id}`,
         {
           method: "PUT",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             nombre: valores.nombre,
             descripcion: valores.descripcion,
             estadoId: Number(valores.estadoId),
             progreso: Number(valores.progreso),
+            direccion: valores.direccion,
           }),
         }
       );
@@ -333,6 +339,7 @@ export default function NuevaTarea() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(bodyUpdateST),
+          credentials: "include",
         }
       );
 
@@ -355,6 +362,7 @@ export default function NuevaTarea() {
         `${process.env.NEXT_PUBLIC_API_URL}/st_material/${id}`,
         {
           method: "DELETE",
+          credentials: "include",
         }
       );
       if (!res.ok) throw new Error("Error al eliminar");

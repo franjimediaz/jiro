@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useRef } from 'react';
-import styles from './SelectorTablaPopup.module.css';
-import * as LucideIcons from 'lucide-react';
+import { useEffect, useState, useRef } from "react";
+import styles from "./SelectorTablaPopup.module.css";
+import * as LucideIcons from "lucide-react";
 type Opcion = {
   label: string;
-  value: number; // Aseguramos que siempre sea número
+  value: number;
   icono?: string;
   color?: string;
 };
@@ -31,25 +31,27 @@ const SelectorTabla: React.FC<Props> = ({
 }) => {
   const [opciones, setOpciones] = useState<Opcion[]>([]);
   const [abierto, setAbierto] = useState(false);
-  const [filtro, setFiltro] = useState('');
+  const [filtro, setFiltro] = useState("");
   const [TieneIconoColor, setTieneIconoColor] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const cargar = async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${tabla}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${tabla}`, {
+        credentials: "include",
+      });
       const data = await res.json();
       const TieneIconoColor = data.length > 0 && data[0].icono && data[0].color;
       const lista = data.map((item: any) => ({
         label: item[campoLabel],
-        value: Number(item[campoValue]), // ← aseguramos tipo number
+        value: Number(item[campoValue]),
         icono: item.icono,
         color: item.color,
       }));
       setOpciones(lista);
       if (data.length > 0 && data[0].icono && data[0].color) {
-      setTieneIconoColor(true);
-}
+        setTieneIconoColor(true);
+      }
     };
     cargar();
   }, [tabla, campoLabel, campoValue]);
@@ -60,8 +62,8 @@ const SelectorTabla: React.FC<Props> = ({
         setAbierto(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const mostrarValor = () => {
@@ -69,10 +71,12 @@ const SelectorTabla: React.FC<Props> = ({
       return opciones
         .filter((op) => valorSeleccionado.includes(op.value))
         .map((op) => op.label)
-        .join(', ');
+        .join(", ");
     }
-    const seleccionado = opciones.find((op) => String(op.value) === String(valorSeleccionado));
-    return seleccionado?.label || 'Selecciona...';
+    const seleccionado = opciones.find(
+      (op) => String(op.value) === String(valorSeleccionado)
+    );
+    return seleccionado?.label || "Selecciona...";
   };
 
   const seleccionar = (valor: string | number) => {
@@ -89,17 +93,20 @@ const SelectorTabla: React.FC<Props> = ({
       setAbierto(false);
     }
   };
-  
 
   const filtradas = opciones.filter((op) =>
     op.label.toLowerCase().includes(filtro.toLowerCase())
   );
 
   const renderIconoLucide = (icono?: string, color?: string) => {
-  if (!icono) return null;
-  const Icono = (LucideIcons as any)[icono];
-  return Icono ? <Icono size={18} color={color || '#000'} /> : <LucideIcons.Circle size={18} color="#ccc" />;
-};
+    if (!icono) return null;
+    const Icono = (LucideIcons as any)[icono];
+    return Icono ? (
+      <Icono size={18} color={color || "#000"} />
+    ) : (
+      <LucideIcons.Circle size={18} color="#ccc" />
+    );
+  };
 
   return (
     <div className={styles.wrapper} ref={ref}>
@@ -109,37 +116,48 @@ const SelectorTabla: React.FC<Props> = ({
       </div>
 
       {abierto && (
-  <>
-    <div className={styles.backdrop} />
-    <div className={styles.popup}>
-      <input
-        type="text"
-        placeholder="Buscar..."
-        value={filtro}
-        onChange={(e) => setFiltro(e.target.value)}
-        className={styles.busqueda}
-      />
-      <ul className={styles.lista}>
-        {filtradas.map((op) => (
-          <li
-              key={op.value}
-              className={`${styles.item} ${
-                multiple && Array.isArray(valorSeleccionado) && valorSeleccionado.includes(op.value)
-                  ? styles.activo
-                  : !multiple && valorSeleccionado === op.value
-                  ? styles.activo
-                  : ''
-              }`}
-              onClick={() => seleccionar(op.value)}
-            >
-              {TieneIconoColor && op.icono && renderIconoLucide(op.icono, op.color)}
-              <span style={{color: op.color, marginLeft: TieneIconoColor ? '0.5rem' : 0 }}>{op.label}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  </>
-)}
+        <>
+          <div className={styles.backdrop} />
+          <div className={styles.popup}>
+            <input
+              type="text"
+              placeholder="Buscar..."
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+              className={styles.busqueda}
+            />
+            <ul className={styles.lista}>
+              {filtradas.map((op) => (
+                <li
+                  key={op.value}
+                  className={`${styles.item} ${
+                    multiple &&
+                    Array.isArray(valorSeleccionado) &&
+                    valorSeleccionado.includes(op.value)
+                      ? styles.activo
+                      : !multiple && valorSeleccionado === op.value
+                        ? styles.activo
+                        : ""
+                  }`}
+                  onClick={() => seleccionar(op.value)}
+                >
+                  {TieneIconoColor &&
+                    op.icono &&
+                    renderIconoLucide(op.icono, op.color)}
+                  <span
+                    style={{
+                      color: op.color,
+                      marginLeft: TieneIconoColor ? "0.5rem" : 0,
+                    }}
+                  >
+                    {op.label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
     </div>
   );
 };

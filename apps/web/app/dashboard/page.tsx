@@ -38,14 +38,19 @@ export default function InicioPage() {
     (async () => {
       try {
         // 1) Intento de KPIs completos
-        const res = await fetch(`${API}/kpis/obras`);
+        const res = await fetch(`${API}/kpis/obras`, {
+          credentials: "include",
+        });
         if (!res.ok) throw new Error("No KPIs endpoint");
         const data = await res.json();
         setKpis(normalizeKpis(data));
       } catch {
         // 2) Fallback: solo contamos obras (tu endpoint actual)
         try {
-          const cRes = await fetch(`${API}/obras/count`);
+          const cRes = await fetch(`${API}/obras/count`, {
+            credentials: "include",
+          });
+          if (!cRes.ok) throw new Error("No count endpoint");
           const cData = await cRes.json();
           setKpis({
             totalObras: Number(cData?.count ?? 0),

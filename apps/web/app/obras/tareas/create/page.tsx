@@ -209,6 +209,7 @@ export default function NuevaTarea() {
             `${process.env.NEXT_PUBLIC_API_URL}/obras/tareas`,
             {
               method: "POST",
+              credentials: "include",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 nombre: "Nueva tarea",
@@ -229,6 +230,7 @@ export default function NuevaTarea() {
             `${process.env.NEXT_PUBLIC_API_URL}/servicios_tarea/${servicioTareaIdParam}`,
             {
               method: "PATCH",
+              credentials: "include",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ tareaId: nuevaTarea.id }),
             }
@@ -349,6 +351,7 @@ export default function NuevaTarea() {
           `${process.env.NEXT_PUBLIC_API_URL}/tareas/${valores.id}`,
           {
             method: "PUT",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               nombre: valores.nombre,
@@ -368,6 +371,7 @@ export default function NuevaTarea() {
           `${process.env.NEXT_PUBLIC_API_URL}/servicios_tarea/${servicioTareaIdParam}`,
           {
             method: "PUT",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(bodyUpdateST), // ✅ CORREGIDO
           }
@@ -380,6 +384,7 @@ export default function NuevaTarea() {
           `${process.env.NEXT_PUBLIC_API_URL}/obras/tareas`,
           {
             method: "POST",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               nombre: valores.nombre,
@@ -410,6 +415,7 @@ export default function NuevaTarea() {
           `${process.env.NEXT_PUBLIC_API_URL}/servicios_tarea`,
           {
             method: "POST",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(bodyUpdateST),
           }
@@ -439,6 +445,7 @@ export default function NuevaTarea() {
         `${process.env.NEXT_PUBLIC_API_URL}/st_material/${id}`,
         {
           method: "DELETE",
+          credentials: "include",
         }
       );
       if (!res.ok) throw new Error("Error al eliminar");

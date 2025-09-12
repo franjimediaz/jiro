@@ -12,65 +12,305 @@ const app = express();
 const prisma = new PrismaClient();
 const loginRouter = require("./routes/login");
 const cookieParser = require("cookie-parser");
+const authz = require("./routes/authz");
 const PORT = process.env.PORT || 3001;
-const frontendURL = "http://localhost:3002";
 const allowedOrigins = [
+  "http://localhost:3000",
   "http://localhost:3002",
   "http://localhost:3001",
   "http://dominio.com",
 ];
 
+function requireAuth(req, res, next) {
+  try {
+    const token = req.cookies?.token; // login guarda 'token'
+    if (!token) return res.status(401).json({ error: "No auth token" });
+
+    const payload = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "secretoSuperSeguro"
+    );
+    // En el login firmas: { id: usuario.idUsuario, rol: usuario.rol }
+    req.user = { id: Number(payload.id), rol: payload.rol };
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: "Token inválido o expirado" });
+  }
+}
+
 app.use(cookieParser());
 app.use(
   cors({
     origin: allowedOrigins,
-    credentials: true, // ⬅️ IMPORTANTE para usar cookies
+    credentials: true,
   })
 );
 app.use(express.json());
-app.use("/login", loginRouter);
 
-// ✅ Servir archivos estáticos desde /uploads
+// Rutas de autenticación
+//app.use("/login", loginRouter);
+
+//  Servir archivos estáticos desde /uploads
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// ✅ Rutas API
+//  Rutas API
 app.use("/api/upload", uploadRoutes); // subida real: POST /api/upload
 app.use("/api/documentos", documentosRoutes);
 app.use("/api", uploadRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+//////////////////////////////////////////////////////////
+// Rutas de debug públicas
+//////////////////////////////////////////////////////////
+
+app.get("/debug/usuario/:id", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: userId },
+      include: {
+        rol: true,
+      },
+    });
+
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    res.json({
+      usuario: {
+        id: usuario.id,
+        idUsuario: usuario.idUsuario,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        activo: usuario.activo,
+        rolId: usuario.rolId,
+      },
+      rol: {
+        id: usuario.rol?.id,
+        nombre: usuario.rol?.nombre,
+        activo: usuario.rol?.activo,
+        permisos: usuario.rol?.permisos,
+      },
+      debug: {
+        tieneRol: !!usuario.rol,
+        tienePermisos: !!usuario.rol?.permisos,
+        cantidadModulos: Object.keys(usuario.rol?.permisos || {}).length,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-//////////
+app.post("/debug/token", (req, res) => {
+  try {
+    const { token } = req.body;
 
-const verificarToken = (req, res, next) => {
-  const auth = req.headers.authorization;
-  if (!auth) return res.status(401).json({ error: "Token requerido" });
+    if (!token) {
+      return res.status(400).json({ error: "Token requerido" });
+    }
+
+    const payload = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "secretoSuperSeguro"
+    );
+
+    res.json({
+      valid: true,
+      payload,
+      decoded: {
+        id: payload.id,
+        rolId: payload.rolId,
+        exp: new Date(payload.exp * 1000),
+        iat: new Date(payload.iat * 1000),
+      },
+    });
+  } catch (error) {
+    res.json({
+      valid: false,
+      error: error.message,
+    });
+  }
+});
+
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email y contraseña obligatorios" });
+  }
 
   try {
-    const token = auth.split(" ")[1];
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.usuario = payload;
-    next();
-  } catch (e) {
-    return res.status(403).json({ error: "Token inválido" });
-  }
-};
+    const usuario = await prisma.usuario.findUnique({
+      where: { email },
+      include: { rol: true },
+    });
 
-const soloAdmin = (req, res, next) => {
-  if (req.usuario.rol !== "admin") {
-    return res
-      .status(403)
-      .json({ error: "Acceso restringido a administradores" });
+    if (!usuario || !usuario.activo) {
+      return res
+        .status(401)
+        .json({ error: "Usuario no encontrado o inactivo" });
+    }
+
+    const passwordValida = await bcrypt.compare(password, usuario.passwordHash);
+    if (!passwordValida) {
+      return res.status(401).json({ error: "Contraseña incorrecta" });
+    }
+
+    // ✅ Generar token con el ID correcto
+    const token = jwt.sign(
+      {
+        id: usuario.id, // ✅ Usar usuario.id (no idUsuario)
+        rolId: usuario.rolId,
+        rolNombre: usuario.rol?.nombre,
+      },
+      process.env.JWT_SECRET || "secretoSuperSeguro",
+      { expiresIn: "1d" }
+    );
+
+    // Enviar como cookie
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000, // 1 día
+    });
+
+    // Devolver solo datos públicos del usuario
+    res.json({
+      usuario: {
+        id: usuario.id, // ✅ Usar usuario.id
+        idUsuario: usuario.idUsuario,
+        nombre: usuario.nombre,
+        rolId: usuario.rolId,
+        rolNombre: usuario.rol?.nombre,
+        email: usuario.email,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error en login:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
   }
-  next();
-};
+});
+
+app.post("/logout", (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+  });
+  res.json({ success: true });
+});
+app.get("/health", (req, res) => {
+  res.json({ status: "OK", timestamp: new Date() });
+});
+
+app.get("/", (req, res) => {
+  res.json({ mensaje: "API JiRo funcionando", timestamp: new Date() });
+});
+
+app.get("/test/middleware", (req, res) => {
+  res.json({
+    mensaje: "Endpoint público funcionando",
+    headers: req.headers,
+    cookies: req.cookies,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/debug/cookies", (req, res) => {
+  res.json({
+    cookies: req.cookies,
+    headers: {
+      cookie: req.headers.cookie,
+      authorization: req.headers.authorization,
+      userAgent: req.headers["user-agent"],
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+//////////////////////////////////////////////////////////
+// Middleware
+//////////////////////////////////////////////////////////
+console.log("🔒 Aplicando middleware de autorización...");
+app.use(authz);
 
 //////////////////////////////////////////////////////////
 //  Rutas para GET
 //////////////////////////////////////////////////////////
 
+/////////////////DEBUG///////////////////////
+app.get("/debug/permisos", (req, res) => {
+  try {
+    console.log("🔍 Debug permisos - Usuario en request:", !!req.usuario);
+
+    res.json({
+      autenticado: !!req.usuario,
+      usuario: req.usuario
+        ? {
+            id: req.usuario.id,
+            nombre: req.usuario.nombre,
+            rolId: req.usuario.rolId,
+            rol: req.usuario.rol?.nombre,
+          }
+        : null,
+      permisos: req.usuario?.permisos || {},
+      cantidadModulos: Object.keys(req.usuario?.permisos || {}).length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error en debug permisos:", error);
+    res.status(500).json({
+      error: "Error en debug permisos",
+      detalles: error.message,
+    });
+  }
+});
+
+//  Endpoint para obtener permisos del usuario autenticado
+app.get("/me/permissions", (req, res) => {
+  try {
+    console.log("🔍 Me/permissions - Usuario en request:", !!req.usuario);
+
+    if (!req.usuario?.permisos) {
+      return res.status(401).json({ error: "No autenticado o sin permisos" });
+    }
+
+    res.json({
+      permisos: req.usuario.permisos,
+      usuario: {
+        id: req.usuario.id,
+        nombre: req.usuario.nombre,
+        rol: req.usuario.rol?.nombre,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error en me/permissions:", error);
+    res.status(500).json({
+      error: "Error al obtener permisos",
+      detalles: error.message,
+    });
+  }
+});
+
+app.get("/test/protegido", (req, res) => {
+  res.json({
+    mensaje: "Endpoint protegido funcionando",
+    usuario: req.usuario
+      ? {
+          id: req.usuario.id,
+          nombre: req.usuario.nombre,
+          rol: req.usuario.rol?.nombre,
+        }
+      : null,
+    middlewareAplicado: true,
+    timestamp: new Date().toISOString(),
+  });
+});
+//////////////////////////////////////////////////////////
 app.get("/obras", async (req, res) => {
   try {
     const obras = await prisma.obra.findMany();
@@ -118,6 +358,7 @@ app.get("/obras/tareas", async (req, res) => {
         nombre: st.tarea.nombre,
         estado: st.tarea.estado?.nombre || "Sin estado",
         servicio: st.servicio?.nombre || "",
+        direccion: st.tarea.direccion,
       }));
 
     res.json(tareasFormateadas); // ✅ debe devolver un array
@@ -319,6 +560,18 @@ app.get("/tareas/:id", async (req, res) => {
     res.status(500).json({ error: "Error al obtener obra" });
   }
 });
+app.get("/tareas", async (req, res) => {
+  try {
+    const tareas = await prisma.tareas.findMany({
+      orderBy: { nombre: "asc" }, // Opcional: orden alfabético
+    });
+
+    res.status(200).json(tareas);
+  } catch (error) {
+    console.error("Error al obtener tareas:", error);
+    res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
 app.get("/estados", async (req, res) => {
   try {
     const estados = await prisma.estados.findMany({
@@ -493,10 +746,36 @@ app.get("/presupuestos/:id/cliente", async (req, res) => {
 });
 app.get("/usuarios", async (req, res) => {
   try {
-    const usuarios = await prisma.usuario.findMany();
-    res.json(usuarios);
+    const usuarios = await prisma.usuario.findMany({
+      select: {
+        id: true,
+        idUsuario: true,
+        nombre: true,
+        apellido: true,
+        email: true,
+        telefono: true,
+        rolId: true, // ✅ Incluir rolId
+        activo: true,
+        createdAt: true,
+        updatedAt: true,
+        // ✅ Incluir información del rol asignado
+        rol: {
+          select: {
+            id: true,
+            nombre: true,
+            descripcion: true,
+            nivel: true,
+            activo: true,
+          },
+        },
+      },
+      orderBy: { nombre: "asc" },
+    });
+
+    res.status(200).json(usuarios);
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener usuarios" });
+    console.error("❌ Error al obtener usuarios:", error);
+    res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 app.get("/usuarios/:id", async (req, res) => {
@@ -508,12 +787,36 @@ app.get("/usuarios/:id", async (req, res) => {
 
   try {
     console.log("🧪 Buscando usuario con ID:", id);
-    const usuario = await prisma.usuario.findUnique({ where: { id } });
+    const usuario = await prisma.usuario.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        idUsuario: true,
+        nombre: true,
+        apellido: true,
+        email: true,
+        telefono: true,
+        rolId: true, // ✅ Incluir rolId
+        activo: true,
+        createdAt: true,
+        updatedAt: true,
+        // ✅ Incluir información del rol asignado
+        rol: {
+          select: {
+            id: true,
+            nombre: true,
+            descripcion: true,
+            nivel: true,
+            activo: true,
+          },
+        },
+      },
+    });
 
     if (!usuario)
       return res.status(404).json({ error: "Usuario no encontrado" });
 
-    res.json(usuario); // 👈 Asegúrate de que se devuelve directo
+    res.json(usuario);
   } catch (error) {
     console.error("❌ Error exacto:", error);
     res.status(500).json({ error: "Error al obtener Usuario" });
@@ -557,7 +860,26 @@ app.get("/facturas", async (req, res) => {
     res.status(500).json({ error: "Error al obtener facturas" });
   }
 });
+app.get("/facturas/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
 
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    console.log("🧪 Buscando factura con ID:", id);
+    const factura = await prisma.facturas.findUnique({ where: { id } });
+
+    if (!factura)
+      return res.status(404).json({ error: "Factura no encontrada" });
+
+    res.json(factura);
+  } catch (error) {
+    console.error("❌ Error exacto:", error);
+    res.status(500).json({ error: "Error al obtener Factura" });
+  }
+});
 app.get("/obras/count", async (req, res) => {
   try {
     const total = await prisma.obra.count();
@@ -593,6 +915,162 @@ app.get("/directorios/:id", async (req, res) => {
   } catch (error) {
     console.error("❌ Error exacto:", error);
     res.status(500).json({ error: "Error al obtener Directorio" });
+  }
+});
+app.get("/modulos", async (req, res) => {
+  try {
+    const modulos = await prisma.modulo.findMany();
+    res.json(modulos);
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener módulos" });
+  }
+});
+app.get("/modulos/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    console.log("🧪 Buscando módulo con ID:", id);
+    const modulo = await prisma.modulo.findUnique({ where: { id } });
+
+    if (!modulo) return res.status(404).json({ error: "Módulo no encontrado" });
+
+    res.json(modulo);
+  } catch (error) {
+    console.error("❌ Error exacto:", error);
+    res.status(500).json({ error: "Error al obtener Módulo" });
+  }
+});
+app.get("/facturas/por-presupuesto/:presupuestoId", async (req, res) => {
+  const presupuestoId = parseInt(req.params.presupuestoId);
+
+  console.log("📥 Buscando facturas con presupuestoId =", presupuestoId);
+
+  if (isNaN(presupuestoId)) {
+    return res.status(400).json({ error: "ID de presupuesto no válido" });
+  }
+
+  try {
+    // ✅ Usar el modelo correcto 'facturas' (plural)
+    const facturas = await prisma.facturas.findMany({
+      where: { presupuestoId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        presupuesto: {
+          select: {
+            descripcion: true,
+            nombre: true,
+            importe: true,
+          },
+        },
+      },
+    });
+
+    console.log("🧾 Facturas encontradas:", facturas.length);
+    res.json(facturas);
+  } catch (error) {
+    console.error("❌ Error al buscar facturas:", error);
+    res.status(500).json({
+      error: "Error al obtener facturas del presupuesto",
+      detalle: error.message,
+    });
+  }
+});
+app.get("/roles", async (req, res) => {
+  try {
+    const roles = await prisma.rol.findMany({
+      orderBy: { nombre: "asc" }, // Orden alfabético
+    });
+
+    res.status(200).json(roles);
+  } catch (error) {
+    console.error("❌ Error al obtener roles:", error);
+    res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+app.get("/roles/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // ✅ Validar que el ID sea un número entero
+    const rolId = parseInt(id);
+    if (isNaN(rolId)) {
+      return res.status(400).json({
+        error: "ID de rol inválido",
+        detalles: "El ID debe ser un número válido",
+      });
+    }
+
+    console.log(`🔍 Buscando rol con ID: ${rolId} (Int)`);
+
+    // ✅ Buscar el rol en la base de datos usando ID entero
+    const rol = await prisma.rol.findUnique({
+      where: {
+        id: rolId, // ✅ Usar como entero
+      },
+    });
+
+    // ✅ Verificar si el rol existe
+    if (!rol) {
+      return res.status(404).json({
+        error: "Rol no encontrado",
+        detalles: `No existe un rol con ID ${rolId}`,
+      });
+    }
+
+    // ✅ Log para debugging
+    console.log(`✅ Rol ${rolId} encontrado:`, {
+      id: rol.id,
+      nombre: rol.nombre,
+      tienePermisos: !!rol.permisos,
+    });
+
+    // ✅ Convertir permisos de JSON a string para el frontend
+    const rolParaFrontend = {
+      ...rol,
+      permisos: JSON.stringify(rol.permisos), // ✅ Convertir JSON a string
+    };
+
+    res.json(rolParaFrontend);
+  } catch (error) {
+    console.error("❌ Error al obtener rol:", error);
+
+    res.status(500).json({
+      error: "Error interno del servidor",
+      detalles: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+app.get("/roles/:id/usuarios", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID de rol inválido" });
+  }
+
+  try {
+    const usuarios = await prisma.usuario.findMany({
+      where: { rolId: id },
+      select: {
+        id: true,
+        idUsuario: true,
+        nombre: true,
+        apellido: true,
+        email: true,
+        telefono: true,
+        activo: true,
+      },
+      orderBy: { nombre: "asc" },
+    });
+
+    res.json(usuarios);
+  } catch (error) {
+    console.error("❌ Error al obtener usuarios por rol:", error);
+    res.status(500).json({ error: "Error al obtener usuarios del rol" });
   }
 });
 
@@ -664,13 +1142,46 @@ app.get("/kpis/obras", async (req, res) => {
   }
 });
 
-// Eliminar una obra
+// GET ME
+
+app.get("/directorio/me", requireAuth, async (req, res) => {
+  try {
+    const idUsuario = req.user.id;
+
+    const perfil = await prisma.usuario.findUnique({
+      where: { idUsuario }, // 👈 ajusta si tu PK es 'id'
+      select: {
+        idUsuario: true,
+        email: true,
+        nombre: true,
+        apellidos: true,
+        rol: true,
+        // ⚠️ Cambia 'directorioEmpleado' por el nombre real de tu relación en Prisma
+        directorioEmpleado: {
+          select: {
+            telefono: true,
+            puesto: true,
+            tipo: true, // enum "INTERNO" | "EXTERNO" si lo usas
+            avatarUrl: true,
+            ubicacion: true,
+            extension: true,
+          },
+        },
+      },
+    });
+
+    if (!perfil)
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    res.json(perfil);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Error al cargar perfil" });
+  }
+});
 
 //////////////////////////////////////////////////////////
 //  POST
 //////////////////////////////////////////////////////////
-
-// Crear una nueva obra
 app.post("/obras", async (req, res) => {
   const { nombre, direccion, fechaInicio, fechaFin, estadoId, clienteId } =
     req.body;
@@ -710,7 +1221,6 @@ app.post("/obras", async (req, res) => {
       .json({ error: "Error al crear la obra", detalle: error.message });
   }
 });
-
 app.post("/estados", async (req, res) => {
   try {
     const { nombre, color, icono } = req.body;
@@ -733,7 +1243,6 @@ app.post("/estados", async (req, res) => {
     res.status(500).json({ error: "Error interno del servidor." });
   }
 });
-
 app.post("/clientes", async (req, res) => {
   const { nombre, apellido, direccion, email, telefono, dni } = req.body;
 
@@ -866,7 +1375,6 @@ app.post("/servicios_tarea", async (req, res) => {
     });
   }
 });
-
 app.post("/materiales", async (req, res) => {
   const { nombre, descripcion, precio, proveedor, stockActual, unidadMedida } =
     req.body;
@@ -925,11 +1433,77 @@ app.post("/modulos", async (req, res) => {
     res.status(500).json({ error: "Error interno del servidor." });
   }
 });
+app.post("/roles", async (req, res) => {
+  const { nombre, descripcion, nivel, activo, permisos } = req.body;
+
+  // Validación de campos obligatorios
+  if (!nombre) {
+    return res.status(400).json({ error: "El campo 'nombre' es obligatorio" });
+  }
+
+  try {
+    // Verificar que no exista un rol con el mismo nombre
+    const rolExistente = await prisma.rol.findFirst({
+      where: {
+        nombre: {
+          equals: nombre,
+          mode: "insensitive", // Búsqueda case-insensitive
+        },
+      },
+    });
+
+    if (rolExistente) {
+      return res.status(400).json({
+        error: "Ya existe un rol con ese nombre",
+      });
+    }
+
+    const nuevoRol = await prisma.rol.create({
+      data: {
+        nombre: nombre.trim(),
+        descripcion: descripcion?.trim() || null,
+        nivel: nivel ? parseInt(nivel) : null,
+        activo: typeof activo === "boolean" ? activo : true,
+        permisos: permisos || null,
+      },
+    });
+
+    res.status(201).json(nuevoRol);
+  } catch (error) {
+    console.error("❌ Error al crear rol:", error);
+
+    if (error.code === "P2002") {
+      return res.status(400).json({
+        error: "Ya existe un rol con ese nombre",
+      });
+    }
+
+    res.status(500).json({
+      error: "Error interno al crear el rol",
+      detalle: error.message,
+    });
+  }
+});
 app.post("/presupuestos", async (req, res) => {
   const { clienteId, obraId, nombre, descripcion, condiciones } = req.body;
 
   try {
     console.log("🟢 Iniciando creación de presupuesto");
+    console.log("📥 Datos recibidos:", {
+      clienteId,
+      obraId,
+      nombre,
+      descripcion,
+      condiciones,
+    });
+
+    // ✅ Validaciones básicas
+    if (!clienteId || !obraId || !descripcion) {
+      return res.status(400).json({
+        error: "Faltan campos obligatorios: clienteId, obraId, descripcion",
+      });
+    }
+
     // 1️⃣ Buscar todos los servicios_tarea relacionados con la obra
     const serviciosTarea = await prisma.servicios_Tarea.findMany({
       where: { obraId: Number(obraId) },
@@ -938,35 +1512,43 @@ app.post("/presupuestos", async (req, res) => {
         tarea: true,
         stMateriales: {
           include: {
-            material: true, // incluir datos del material
+            material: true,
           },
         },
       },
     });
 
-    // 2️⃣ Calcular base imponible (sumando `total` de cada línea de servicio_tarea)
+    console.log("🔍 Servicios_Tarea encontrados:", serviciosTarea.length);
+
+    // 2️⃣ Calcular base imponible
     const baseImponible = serviciosTarea.reduce(
       (acc, st) => acc + (st.total || 0),
       0
     );
     const importe = parseFloat((baseImponible * 1.21).toFixed(2));
 
-    // 3️⃣ Crear el presupuesto
+    console.log("💰 Base imponible:", baseImponible, "Importe final:", importe);
+
+    // 3️⃣ Crear el presupuesto - ✅ CORREGIR CAMPO "descripción"
     const nuevoPresupuesto = await prisma.presupuesto.create({
       data: {
         clienteId: Number(clienteId),
         obraId: Number(obraId),
-        nombre,
-        descripción: descripcion,
+        nombre: nombre || "Presupuesto sin nombre",
+        descripcion: descripcion, // ✅ SIN TILDE - debe coincidir con el schema
         importe,
-        condiciones,
+        condiciones: condiciones || null,
       },
     });
 
-    // 4️⃣ Agrupar por servicioId y crear snapshot
+    console.log("✅ Presupuesto creado:", nuevoPresupuesto.id);
+
+    // 4️⃣ Crear snapshot de servicios y tareas
     const serviciosUnicos = [
       ...new Set(serviciosTarea.map((st) => st.servicioId)),
     ];
+
+    console.log("📋 Servicios únicos a procesar:", serviciosUnicos.length);
 
     for (const servicioId of serviciosUnicos) {
       const tareasServicio = serviciosTarea.filter(
@@ -974,54 +1556,71 @@ app.post("/presupuestos", async (req, res) => {
       );
       const nombreServicio =
         tareasServicio[0]?.servicio?.nombre || "Servicio sin nombre";
-      console.log("➕ Añadiendo servicio al snapshot:", nombreServicio);
+
+      console.log("➕ Añadiendo servicio:", nombreServicio);
+
+      // ✅ Crear servicio en presupuesto
       const servicioPresupuesto = await prisma.presupuesto_Servicio.create({
         data: {
           presupuestoId: nuevoPresupuesto.id,
-          servicioId,
+          servicioId: Number(servicioId),
           nombre: nombreServicio,
         },
       });
 
+      // ✅ Procesar tareas del servicio
       for (const st of tareasServicio) {
         const nombreTarea = st.tarea?.nombre || "Tarea sin nombre";
         console.log("  ↪ Añadiendo tarea:", nombreTarea);
+
         const tareaPresupuesto = await prisma.presupuesto_Tarea.create({
           data: {
             presupuestoServicioId: servicioPresupuesto.id,
-            tareaId: st.tarea?.id ?? null,
+            tareaId: st.tarea?.id || null,
             nombre: nombreTarea,
-            descripcion: st.tarea?.descripcion ?? "Sin descripción",
-            precioManoObra: st.precioManoObra ?? 0,
-            total: st.total ?? 0,
-            cantidad: st.cantidadMateriales ?? 1,
-            totalMateriales: st.precioMateriales ?? 0,
+            descripcion: st.tarea?.descripcion || "Sin descripción",
+            precioManoObra: st.precioManoObra || 0,
+            total: st.total || 0,
+            cantidad: st.cantidadMateriales || 1,
+            totalMateriales: st.precioMateriales || 0,
           },
         });
 
-        // Recorrer los materiales desde st_material
-        for (const stMat of st.stMateriales) {
+        // ✅ Procesar materiales de la tarea
+        for (const stMat of st.stMateriales || []) {
           const nombreMaterial =
             stMat.material?.nombre || "Material sin nombre";
           console.log("    ↪ Añadiendo material:", nombreMaterial);
+
           await prisma.presupuesto_Material.create({
             data: {
               presupuestoTareaId: tareaPresupuesto.id,
               nombre: nombreMaterial,
-              cantidad: stMat.cantidad,
-              precioUnidad: stMat.preciounidad,
-              total: stMat.total,
-              facturable: stMat.facturable,
+              cantidad: stMat.cantidad || 0,
+              precioUnidad: stMat.preciounidad || 0,
+              total: stMat.total || 0,
+              facturable: stMat.facturable || false,
             },
           });
         }
       }
     }
 
-    res.json(nuevoPresupuesto);
+    console.log(
+      "🎉 Presupuesto creado exitosamente con ID:",
+      nuevoPresupuesto.id
+    );
+    res.status(201).json(nuevoPresupuesto);
   } catch (error) {
-    console.error("❌ Error al crear el presupuesto:", error);
-    res.status(500).json({ error: "Error al crear el presupuesto" });
+    console.error("❌ Error detallado al crear presupuesto:", error);
+    console.error("❌ Stack trace:", error.stack);
+
+    // ✅ Respuesta de error más detallada
+    res.status(500).json({
+      error: "Error al crear el presupuesto",
+      detalle: error.message,
+      codigo: error.code,
+    });
   }
 });
 app.post("/st_material", async (req, res) => {
@@ -1126,7 +1725,7 @@ app.post("/usuarios", async (req, res) => {
     email,
     telefono,
     password,
-    rol = "operario",
+    rolId,
     activo,
     idUsuario,
   } = req.body;
@@ -1152,7 +1751,7 @@ app.post("/usuarios", async (req, res) => {
         email,
         telefono,
         passwordHash,
-        rol,
+        rolId,
         activo,
       },
     });
@@ -1210,7 +1809,7 @@ app.post("/directorios", async (req, res) => {
     tags,
   } = req.body;
 
-  if (!email || !password || !nombre) {
+  if (!nombre || !apellido || !email) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
   }
 
@@ -1320,69 +1919,187 @@ app.post("/facturas", async (req, res) => {
 });
 
 //////////////////////////////////////////////////////////
-//  POST Login
+//  PUT
 //////////////////////////////////////////////////////////
-app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email y contraseña obligatorios" });
+app.put("/roles/:id", async (req, res) => {
+  const { id } = req.params;
+  const { nombre, descripcion, nivel, activo, permisos } = req.body;
+
+  try {
+    // ✅ Validar que el ID sea un número entero
+    const rolId = parseInt(id);
+    if (isNaN(rolId)) {
+      return res.status(400).json({
+        error: "ID de rol inválido",
+      });
+    }
+
+    console.log(`🔍 Actualizando rol con ID: ${rolId} (Int)`);
+
+    // ✅ Validaciones básicas
+    if (!nombre || !nombre.trim()) {
+      return res.status(400).json({
+        error: "El campo 'nombre' es obligatorio",
+      });
+    }
+
+    // ✅ Verificar que el rol existe
+    const rolExistente = await prisma.rol.findUnique({
+      where: { id: rolId },
+    });
+
+    if (!rolExistente) {
+      return res.status(404).json({
+        error: "Rol no encontrado",
+        detalles: `No existe un rol con ID ${rolId}`,
+      });
+    }
+
+    // ✅ Verificar duplicados de nombre (excluyendo el rol actual)
+    const nombreDuplicado = await prisma.rol.findFirst({
+      where: {
+        nombre: {
+          equals: nombre.trim(),
+          mode: "insensitive",
+        },
+        NOT: {
+          id: rolId,
+        },
+      },
+    });
+
+    if (nombreDuplicado) {
+      return res.status(400).json({
+        error: "Ya existe otro rol con ese nombre",
+      });
+    }
+
+    // ✅ Validar y parsear permisos
+    let permisosObj = rolExistente.permisos; // Mantener los existentes por defecto
+
+    if (permisos) {
+      try {
+        permisosObj = JSON.parse(permisos);
+        const tieneAlgunPermiso = Object.values(permisosObj).some((modulo) =>
+          Object.values(modulo).some(Boolean)
+        );
+
+        if (!tieneAlgunPermiso) {
+          return res.status(400).json({
+            error: "El rol debe tener al menos un permiso asignado",
+          });
+        }
+      } catch (e) {
+        return res.status(400).json({
+          error: "El formato de permisos no es válido",
+        });
+      }
+    }
+
+    // ✅ Actualizar el rol
+    const rolActualizado = await prisma.rol.update({
+      where: { id: rolId },
+      data: {
+        nombre: nombre.trim(),
+        descripcion: descripcion?.trim() || null,
+        nivel: nivel ? parseInt(nivel) : rolExistente.nivel,
+        activo: typeof activo === "boolean" ? activo : rolExistente.activo,
+        permisos: permisosObj, // ✅ Guardar como JSON
+        updatedAt: new Date(),
+      },
+    });
+
+    // ✅ Log para debugging
+    console.log(`✅ Rol ${rolId} actualizado:`, {
+      id: rolActualizado.id,
+      nombre: rolActualizado.nombre,
+      cambios: {
+        nombre: rolExistente.nombre !== rolActualizado.nombre,
+        nivel: rolExistente.nivel !== rolActualizado.nivel,
+        activo: rolExistente.activo !== rolActualizado.activo,
+        permisos:
+          JSON.stringify(rolExistente.permisos) !==
+          JSON.stringify(rolActualizado.permisos),
+      },
+    });
+
+    // ✅ Convertir permisos a string para el frontend
+    const rolParaFrontend = {
+      ...rolActualizado,
+      permisos: JSON.stringify(rolActualizado.permisos),
+    };
+
+    res.json(rolParaFrontend);
+  } catch (error) {
+    console.error("❌ Error al actualizar rol:", error);
+
+    if (error.code === "P2002") {
+      return res.status(400).json({
+        error: "Ya existe un rol con ese nombre",
+      });
+    }
+
+    res.status(500).json({
+      error: "Error interno al actualizar el rol",
+      detalles: error.message,
+    });
+  }
+});
+app.put("/roles/:id/estado", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { activo } = req.body;
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  if (typeof activo !== "boolean") {
+    return res.status(400).json({
+      error: "El campo 'activo' debe ser boolean",
+    });
   }
 
   try {
-    const usuario = await prisma.usuario.findUnique({ where: { email } });
+    // Verificar cuántos usuarios tienen este rol antes de desactivar
+    if (!activo) {
+      const usuariosConRol = await prisma.usuario.count({
+        where: { rolId: id, activo: true },
+      });
 
-    if (!usuario || !usuario.activo) {
-      return res
-        .status(401)
-        .json({ error: "Usuario no encontrado o inactivo" });
+      if (usuariosConRol > 0) {
+        return res.status(400).json({
+          error: `No se puede desactivar el rol. Hay ${usuariosConRol} usuarios activos con este rol.`,
+          suggestion: "Reasigna los usuarios a otro rol antes de desactivar.",
+        });
+      }
     }
 
-    const passwordValida = await bcrypt.compare(password, usuario.passwordHash);
-    if (!passwordValida) {
-      return res.status(401).json({ error: "Contraseña incorrecta" });
-    }
-
-    // Generar token
-    const token = jwt.sign(
-      { id: usuario.idUsuario, rol: usuario.rol },
-      process.env.JWT_SECRET || "secretoSuperSeguro",
-      { expiresIn: "1d" }
-    );
-
-    // Enviar como cookie
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000, // 1 día
-    });
-
-    // Devolver solo datos públicos del usuario
-    res.json({
-      usuario: {
-        id: usuario.idUsuario,
-        nombre: usuario.nombre,
-        rol: usuario.rol,
-        email: usuario.email,
+    const rolActualizado = await prisma.rol.update({
+      where: { id },
+      data: { activo },
+      select: {
+        id: true,
+        nombre: true,
+        descripcion: true,
+        activo: true,
       },
     });
-  } catch (err) {
-    console.error("❌ Error en login:", err);
-    res.status(500).json({ error: "Error interno del servidor" });
+
+    res.json(rolActualizado);
+  } catch (error) {
+    console.error("❌ Error al cambiar estado del rol:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Rol no encontrado" });
+    }
+
+    res.status(500).json({
+      error: "Error al cambiar estado del rol",
+      detalle: error.message,
+    });
   }
 });
-app.post("/logout", (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax", // usa "strict" si puedes
-  });
-  res.json({ success: true });
-});
-//////////////////////////////////////////////////////////
-//  PUT
-//////////////////////////////////////////////////////////
 app.put("/clientes/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const { nombre, apellido, direccion, email, telefono, dni } = req.body;
@@ -1441,7 +2158,7 @@ app.put("/obras/:id", async (req, res) => {
 });
 app.put("/tareas/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { nombre, descripcion, estado, progreso } = req.body;
+  const { nombre, descripcion, estado, progreso, direccion } = req.body;
 
   if (!id || !nombre) {
     return res
@@ -1457,6 +2174,7 @@ app.put("/tareas/:id", async (req, res) => {
         descripcion,
         estado,
         progreso,
+        direccion,
       },
     });
 
@@ -1476,6 +2194,7 @@ app.put("/servicios_tarea/:id", async (req, res) => {
     tareaId,
     fechaInicio,
     fechaFin,
+    usuarioId,
     precioManoObra,
     precioMateriales,
     cantidadMateriales,
@@ -1494,6 +2213,7 @@ app.put("/servicios_tarea/:id", async (req, res) => {
         obraId: Number(obraId),
         servicioId: Number(servicioId),
         tareaId: tareaId ? Number(tareaId) : null,
+        usuarioId: usuarioId ? Number(usuarioId) : null,
         fechaInicio: fechaInicio ? new Date(fechaInicio) : null,
         fechaFin: fechaFin ? new Date(fechaFin) : null,
         precioManoObra: precioManoObra ? parseFloat(precioManoObra) : 0,
@@ -1599,27 +2319,658 @@ app.put("/presupuestos/:id", async (req, res) => {
 });
 app.put("/materiales/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { nombre } = req.body;
+  const { nombre, descripcion, precio, proveedor, stockActual, unidadMedida } =
+    req.body;
 
-  if (!nombre) {
-    return res.status(400).json({ error: "Faltan campos obligatorios" });
+  if (!nombre || !descripcion || !proveedor) {
+    return res.status(400).json({
+      error: "Faltan campos obligatorios: nombre, descripcion, proveedor",
+    });
   }
 
   try {
     const materialActualizado = await prisma.materiales.update({
       where: { id },
-      data: { nombre, stockActual, precio },
+      data: {
+        nombre,
+        descripcion,
+        precio: precio ? parseFloat(precio) : 0,
+        proveedor,
+        stockActual: stockActual ? Number(stockActual) : null,
+        unidadMedida: unidadMedida || null,
+      },
     });
+
     res.json(materialActualizado);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error al actualizar material" });
+    console.error("❌ Error al actualizar material:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Material no encontrado" });
+    }
+
+    res.status(500).json({
+      error: "Error al actualizar material",
+      detalle: error.message,
+    });
   }
 });
+app.put("/modulos/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { nombre, ruta, icono, orden, padreId } = req.body;
 
+  if (!nombre) {
+    return res.status(400).json({ error: "El campo 'nombre' es obligatorio" });
+  }
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID de módulo no válido" });
+  }
+
+  try {
+    const moduloActualizado = await prisma.modulo.update({
+      where: { id },
+      data: {
+        nombre,
+        ruta: ruta || null,
+        icono: icono || null,
+        orden: orden ? Number(orden) : null,
+        padreId: padreId ? Number(padreId) : null,
+      },
+    });
+
+    res.json(moduloActualizado);
+  } catch (error) {
+    console.error("[PUT /modulos/:id] Error al actualizar módulo:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Módulo no encontrado" });
+    }
+
+    res.status(500).json({
+      error: "Error al actualizar módulo",
+      detalle: error.message,
+    });
+  }
+});
+app.put("/facturas/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const {
+    numero,
+    descripcion,
+    referencia,
+    fecha,
+    importe,
+    estado,
+    cobrada,
+    cantidad,
+    presupuestoId,
+  } = req.body;
+
+  console.log("📝 Actualizando factura ID:", id);
+  console.log("📥 Datos recibidos:", req.body);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID de factura no válido" });
+  }
+
+  // ✅ Validaciones básicas
+  if (!referencia) {
+    return res.status(400).json({ error: "La referencia es obligatoria" });
+  }
+
+  try {
+    // ✅ Verificar que la factura existe
+    const facturaExistente = await prisma.facturas.findUnique({
+      where: { id },
+    });
+
+    if (!facturaExistente) {
+      return res.status(404).json({ error: "Factura no encontrada" });
+    }
+
+    // ✅ Preparar datos para actualizar
+    const datosActualizacion = {
+      numero: numero || null,
+      descripcion: descripcion || null,
+      referencia,
+      fecha: fecha ? new Date(fecha) : facturaExistente.fecha,
+      importe: importe ? parseFloat(importe) : facturaExistente.importe,
+      estado: estado || facturaExistente.estado || "pendiente",
+      cobrada:
+        typeof cobrada === "boolean" ? cobrada : facturaExistente.cobrada,
+      cantidad: cantidad ? parseInt(cantidad) : facturaExistente.cantidad,
+      presupuestoId: presupuestoId
+        ? parseInt(presupuestoId)
+        : facturaExistente.presupuestoId,
+      updatedAt: new Date(), // ✅ Actualizar timestamp
+    };
+
+    console.log("💾 Datos que se van a actualizar:", datosActualizacion);
+
+    // ✅ Actualizar la factura
+    const facturaActualizada = await prisma.facturas.update({
+      where: { id },
+      data: datosActualizacion,
+      include: {
+        presupuesto: {
+          select: {
+            descripcion: true,
+            nombre: true,
+            importe: true,
+          },
+        },
+      },
+    });
+
+    console.log("✅ Factura actualizada exitosamente:", facturaActualizada.id);
+    res.json(facturaActualizada);
+  } catch (error) {
+    console.error("❌ Error al actualizar factura:", error);
+
+    // ✅ Manejo de errores específicos de Prisma
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Factura no encontrada" });
+    }
+
+    if (error.code === "P2003") {
+      return res.status(400).json({
+        error: "El presupuestoId proporcionado no existe",
+      });
+    }
+
+    res.status(500).json({
+      error: "Error al actualizar factura",
+      detalle: error.message,
+      codigo: error.code,
+    });
+  }
+});
+app.put("/usuarios/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { nombre, apellido, email, telefono, rolId, activo } = req.body;
+
+  if (!nombre || !email) {
+    return res.status(400).json({ error: "Faltan campos obligatorios" });
+  }
+
+  try {
+    // ✅ Verificar que el usuario existe
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { id },
+      select: { id: true, email: true, rolId: true },
+    });
+
+    if (!usuarioExistente) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    // ✅ Verificar email duplicado (excluyendo el usuario actual)
+    if (email !== usuarioExistente.email) {
+      const emailExistente = await prisma.usuario.findFirst({
+        where: {
+          email: email,
+          NOT: { id: id },
+        },
+      });
+
+      if (emailExistente) {
+        return res.status(400).json({
+          error: "Ya existe otro usuario con ese email",
+        });
+      }
+    }
+
+    // ✅ Validar y procesar rolId como entero
+    let rolIdFinal = null;
+
+    if (rolId && rolId !== "null" && rolId !== "" && rolId !== "undefined") {
+      const rolIdInt = parseInt(rolId);
+
+      if (isNaN(rolIdInt)) {
+        return res.status(400).json({
+          error: "El rolId debe ser un número válido",
+        });
+      }
+
+      const rolExistente = await prisma.rol.findUnique({
+        where: { id: rolIdInt }, // ✅ rolId como entero
+        select: { id: true, nombre: true, activo: true },
+      });
+
+      if (!rolExistente) {
+        return res.status(400).json({
+          error: "El rol especificado no existe",
+        });
+      }
+
+      if (!rolExistente.activo) {
+        return res.status(400).json({
+          error: "No se puede asignar un rol inactivo",
+        });
+      }
+
+      rolIdFinal = rolIdInt;
+    }
+
+    // ✅ Preparar datos para actualizar
+    const datosActualizacion = {
+      nombre,
+      apellido: apellido || null,
+      email,
+      telefono: telefono || null,
+      rolId: rolIdFinal, // ✅ Puede ser null o entero
+      activo: typeof activo === "boolean" ? activo : true,
+      updatedAt: new Date(),
+    };
+
+    console.log("📝 Actualizando usuario con datos:", {
+      ...datosActualizacion,
+      rolIdOriginal: rolId,
+      rolIdFinal: rolIdFinal,
+    });
+
+    const usuarioActualizado = await prisma.usuario.update({
+      where: { id },
+      data: datosActualizacion,
+      select: {
+        id: true,
+        idUsuario: true,
+        nombre: true,
+        apellido: true,
+        email: true,
+        telefono: true,
+        rolId: true, // ✅ Incluir en respuesta
+        activo: true,
+        createdAt: true,
+        updatedAt: true,
+        // ✅ Incluir información del rol asignado (según tu schema se llama 'rol')
+        rol: {
+          select: {
+            id: true,
+            nombre: true,
+            descripcion: true,
+            nivel: true,
+            activo: true,
+          },
+        },
+      },
+    });
+
+    // ✅ Log para debugging
+    console.log(`✅ Usuario ${id} actualizado:`, {
+      id: usuarioActualizado.id,
+      email: usuarioActualizado.email,
+      rolIdAnterior: usuarioExistente.rolId,
+      rolIdNuevo: usuarioActualizado.rolId,
+      rolAsignado: usuarioActualizado.rol?.nombre || "Sin rol del sistema",
+    });
+
+    res.json(usuarioActualizado);
+  } catch (error) {
+    console.error("❌ Error al actualizar usuario:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    if (error.code === "P2002") {
+      return res.status(400).json({ error: "Email ya existe" });
+    }
+
+    if (error.code === "P2003") {
+      return res.status(400).json({
+        error: "El rolId proporcionado no es válido",
+      });
+    }
+
+    res.status(500).json({
+      error: "Error al actualizar usuario",
+      detalle: error.message,
+    });
+  }
+});
+app.put("/directorios/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const {
+    tipo,
+    estado,
+    nombre,
+    apellidos,
+    displayName,
+    dni,
+    email,
+    emailPersonal,
+    telefono,
+    telefono2,
+    fotoUrl,
+    puesto,
+    departamentoId,
+    departamento,
+    supervisorId,
+    supervisor,
+    subordinados,
+    rol,
+    jornada,
+    turno,
+    empresaExternaId,
+    empresaExterna,
+    usuarioId,
+    calendarEmail,
+    costeHora,
+    tarifaFacturacionHora,
+    moneda,
+    capacidadSemanalHoras,
+    tienePRL,
+    prlVencimiento,
+    rcVigente,
+    rcVencimiento,
+    ubicacionCiudad,
+    ubicacionProvincia,
+    ubicacionPais,
+    fechaAlta,
+    fechaBaja,
+    observaciones,
+    tags,
+  } = req.body;
+
+  if (!nombre || !email) {
+    return res
+      .status(400)
+      .json({ error: "Faltan campos obligatorios: nombre, email" });
+  }
+
+  try {
+    const directorioActualizado = await prisma.directorios.update({
+      where: { id },
+      data: {
+        tipo,
+        estado,
+        nombre,
+        apellidos,
+        displayName,
+        dni,
+        email,
+        emailPersonal,
+        telefono,
+        telefono2,
+        fotoUrl,
+        puesto,
+        departamentoId: departamentoId ? Number(departamentoId) : null,
+        departamento,
+        supervisorId: supervisorId ? Number(supervisorId) : null,
+        supervisor,
+        subordinados,
+        rol,
+        jornada,
+        turno,
+        empresaExternaId: empresaExternaId ? Number(empresaExternaId) : null,
+        empresaExterna,
+        usuarioId: usuarioId ? Number(usuarioId) : null,
+        calendarEmail,
+        costeHora: costeHora ? parseFloat(costeHora) : null,
+        tarifaFacturacionHora: tarifaFacturacionHora
+          ? parseFloat(tarifaFacturacionHora)
+          : null,
+        moneda,
+        capacidadSemanalHoras: capacidadSemanalHoras
+          ? parseFloat(capacidadSemanalHoras)
+          : null,
+        tienePRL: typeof tienePRL === "boolean" ? tienePRL : null,
+        prlVencimiento: prlVencimiento ? new Date(prlVencimiento) : null,
+        rcVigente: typeof rcVigente === "boolean" ? rcVigente : null,
+        rcVencimiento: rcVencimiento ? new Date(rcVencimiento) : null,
+        ubicacionCiudad,
+        ubicacionProvincia,
+        ubicacionPais,
+        fechaAlta: fechaAlta ? new Date(fechaAlta) : null,
+        fechaBaja: fechaBaja ? new Date(fechaBaja) : null,
+        observaciones,
+        tags,
+      },
+    });
+
+    res.json(directorioActualizado);
+  } catch (error) {
+    console.error("❌ Error al actualizar directorio:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Directorio no encontrado" });
+    }
+
+    if (error.code === "P2002") {
+      return res.status(400).json({ error: "Email ya existe en directorio" });
+    }
+
+    res.status(500).json({
+      error: "Error al actualizar directorio",
+      detalle: error.message,
+    });
+  }
+});
+app.put("/st_material/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const {
+    ServicioTareaId,
+    materialesId,
+    cantidad,
+    preciounidad,
+    total,
+    facturable,
+  } = req.body;
+
+  if (!ServicioTareaId || !materialesId || !cantidad || !preciounidad) {
+    return res.status(400).json({ error: "Faltan campos obligatorios" });
+  }
+
+  try {
+    const stMaterialActualizado = await prisma.sT_Material.update({
+      where: { id },
+      data: {
+        ServicioTareaId: Number(ServicioTareaId),
+        materialesId: Number(materialesId),
+        cantidad: Number(cantidad),
+        preciounidad: Number(preciounidad),
+        total: total ? Number(total) : Number(cantidad) * Number(preciounidad),
+        facturable: typeof facturable === "boolean" ? facturable : true,
+      },
+      include: {
+        material: true,
+      },
+    });
+
+    res.json(stMaterialActualizado);
+  } catch (error) {
+    console.error("❌ Error al actualizar ST_Material:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "ST_Material no encontrado" });
+    }
+
+    if (error.code === "P2003") {
+      return res
+        .status(400)
+        .json({ error: "ServicioTareaId o materialesId no válido" });
+    }
+
+    res.status(500).json({
+      error: "Error al actualizar ST_Material",
+      detalle: error.message,
+    });
+  }
+});
+app.put("/usuarios/:id/password", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { passwordActual, passwordNueva } = req.body;
+
+  if (!passwordActual || !passwordNueva) {
+    return res
+      .status(400)
+      .json({ error: "Se requieren password actual y nueva" });
+  }
+
+  try {
+    // Verificar usuario existe
+    const usuario = await prisma.usuario.findUnique({
+      where: { id },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    // Verificar password actual
+    const passwordValida = await bcrypt.compare(
+      passwordActual,
+      usuario.passwordHash
+    );
+    if (!passwordValida) {
+      return res.status(401).json({ error: "Password actual incorrecta" });
+    }
+
+    // Hashear nueva password
+    const nuevaPasswordHash = await bcrypt.hash(passwordNueva, 10);
+
+    // Actualizar
+    await prisma.usuario.update({
+      where: { id },
+      data: { passwordHash: nuevaPasswordHash },
+    });
+
+    res.json({ mensaje: "Password actualizada correctamente" });
+  } catch (error) {
+    console.error("❌ Error al cambiar password:", error);
+    res.status(500).json({
+      error: "Error al cambiar password",
+      detalle: error.message,
+    });
+  }
+});
+app.put("/usuarios/:id/estado", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { activo } = req.body;
+
+  if (typeof activo !== "boolean") {
+    return res
+      .status(400)
+      .json({ error: "El campo 'activo' debe ser boolean" });
+  }
+
+  try {
+    const usuarioActualizado = await prisma.usuario.update({
+      where: { id },
+      data: { activo },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        activo: true,
+      },
+    });
+
+    res.json(usuarioActualizado);
+  } catch (error) {
+    console.error("❌ Error al cambiar estado usuario:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    res.status(500).json({
+      error: "Error al cambiar estado del usuario",
+      detalle: error.message,
+    });
+  }
+});
 //////////////////////////////////////////////////////////
 //  DELETE
 //////////////////////////////////////////////////////////
+
+app.delete("/roles/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // ✅ Verificar si hay usuarios que dependen de este rol
+    const usuariosConRol = await prisma.usuario.count({
+      where: { rolId: id }, // ✅ Usar como string
+    });
+
+    if (usuariosConRol > 0) {
+      return res.status(400).json({
+        error: `No se puede eliminar el rol. Hay ${usuariosConRol} usuarios asignados a este rol.`,
+        suggestion: "Reasigna los usuarios a otro rol antes de eliminar.",
+      });
+    }
+
+    // ✅ Verificar que no sea un rol del sistema (opcional)
+    const rol = await prisma.rol.findUnique({
+      where: { id: id }, // ✅ Usar como string
+      select: { nombre: true },
+    });
+
+    if (!rol) {
+      return res.status(404).json({ error: "Rol no encontrado" });
+    }
+
+    // Prevenir eliminación de roles críticos del sistema
+    const rolesSistema = ["admin", "administrador", "superadmin"];
+    if (rolesSistema.includes(rol.nombre.toLowerCase())) {
+      return res.status(400).json({
+        error: "No se puede eliminar un rol del sistema",
+        suggestion: "Desactiva el rol en lugar de eliminarlo.",
+      });
+    }
+
+    await prisma.rol.delete({ where: { id: id } }); // ✅ Usar como string
+
+    res.json({
+      mensaje: "Rol eliminado correctamente",
+      rolEliminado: rol.nombre,
+    });
+  } catch (error) {
+    console.error("❌ Error al eliminar rol:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Rol no encontrado" });
+    }
+
+    if (error.code === "P2003") {
+      return res.status(400).json({
+        error: "No se puede eliminar el rol porque tiene usuarios asignados",
+      });
+    }
+
+    res.status(500).json({
+      error: "Error al eliminar rol",
+      detalle: error.message,
+    });
+  }
+});
+app.delete("/roles/all", async (req, res) => {
+  try {
+    // Verificar que no haya usuarios con roles asignados
+    const usuariosConRoles = await prisma.usuario.count({
+      where: { rolId: { not: null } },
+    });
+
+    if (usuariosConRoles > 0) {
+      return res.status(400).json({
+        error: `No se pueden eliminar todos los roles. Hay ${usuariosConRoles} usuarios con roles asignados.`,
+        suggestion: "Elimina o reasigna todos los usuarios primero.",
+      });
+    }
+
+    await prisma.rol.deleteMany();
+
+    res.json({
+      mensaje: "✅ Todos los roles eliminados correctamente",
+    });
+  } catch (error) {
+    console.error("[DELETE /roles/all]", error);
+    res.status(500).json({ error: "Error al eliminar todos los roles" });
+  }
+});
 app.delete("/clientes/:id", async (req, res) => {
   const id = parseInt(req.params.id);
 
@@ -1746,7 +3097,344 @@ app.delete("/presupuestos/:id", async (req, res) => {
     res.status(500).json({ error: "Error al eliminar Presupuesto asignado" });
   }
 });
+app.delete("/modulos/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
 
+  try {
+    await prisma.modulo.delete({ where: { id } });
+    res.json({ mensaje: "Módulo eliminado correctamente" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al eliminar módulo" });
+  }
+});
+app.delete("/servicios/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    // ✅ Verificar si hay servicios_tarea que dependen de este servicio
+    const serviciosTareaExistentes = await prisma.servicios_Tarea.count({
+      where: { servicioId: id },
+    });
+
+    if (serviciosTareaExistentes > 0) {
+      return res.status(400).json({
+        error: `No se puede eliminar el servicio. Hay ${serviciosTareaExistentes} tareas asignadas a este servicio.`,
+        suggestion:
+          "Elimina primero las tareas asignadas o cambia su servicio.",
+      });
+    }
+
+    await prisma.servicios.delete({ where: { id } });
+    res.json({ mensaje: "Servicio eliminado correctamente" });
+  } catch (error) {
+    console.error("❌ Error al eliminar servicio:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Servicio no encontrado" });
+    }
+
+    res.status(500).json({
+      error: "Error al eliminar servicio",
+      detalle: error.message,
+    });
+  }
+});
+app.delete("/estados/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    // ✅ Verificar si hay tareas u obras que usan este estado
+    const [tareasConEstado, obrasConEstado] = await Promise.all([
+      prisma.tareas.count({ where: { estadoId: id } }),
+      prisma.obra.count({ where: { estadoId: id } }),
+    ]);
+
+    if (tareasConEstado > 0 || obrasConEstado > 0) {
+      return res.status(400).json({
+        error: `No se puede eliminar el estado. Está siendo usado por ${tareasConEstado} tareas y ${obrasConEstado} obras.`,
+        suggestion: "Cambia el estado de las tareas/obras antes de eliminar.",
+      });
+    }
+
+    await prisma.estados.delete({ where: { id } });
+    res.json({ mensaje: "Estado eliminado correctamente" });
+  } catch (error) {
+    console.error("❌ Error al eliminar estado:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Estado no encontrado" });
+    }
+
+    res.status(500).json({
+      error: "Error al eliminar estado",
+      detalle: error.message,
+    });
+  }
+});
+app.delete("/materiales/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    // ✅ Verificar si hay ST_Material que dependen de este material
+    const stMaterialesExistentes = await prisma.sT_Material.count({
+      where: { materialesId: id },
+    });
+
+    if (stMaterialesExistentes > 0) {
+      return res.status(400).json({
+        error: `No se puede eliminar el material. Hay ${stMaterialesExistentes} asignaciones activas.`,
+        suggestion:
+          "Elimina primero las asignaciones de material a servicios/tareas.",
+      });
+    }
+
+    await prisma.materiales.delete({ where: { id } });
+    res.json({ mensaje: "Material eliminado correctamente" });
+  } catch (error) {
+    console.error("❌ Error al eliminar material:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Material no encontrado" });
+    }
+
+    res.status(500).json({
+      error: "Error al eliminar material",
+      detalle: error.message,
+    });
+  }
+});
+app.delete("/servicios_tarea/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    // ✅ Primero eliminar los materiales asociados
+    await prisma.sT_Material.deleteMany({
+      where: { ServicioTareaId: id },
+    });
+
+    // ✅ Luego eliminar el servicios_tarea
+    await prisma.servicios_Tarea.delete({ where: { id } });
+
+    res.json({
+      mensaje:
+        "Servicios_Tarea y materiales asociados eliminados correctamente",
+    });
+  } catch (error) {
+    console.error("❌ Error al eliminar servicios_tarea:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Servicios_Tarea no encontrado" });
+    }
+
+    res.status(500).json({
+      error: "Error al eliminar servicios_tarea",
+      detalle: error.message,
+    });
+  }
+});
+app.delete("/usuarios/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    // ✅ Verificar si hay servicios_tarea asignados a este usuario
+    const serviciosTareaAsignados = await prisma.servicios_Tarea.count({
+      where: { usuarioId: id },
+    });
+
+    if (serviciosTareaAsignados > 0) {
+      return res.status(400).json({
+        error: `No se puede eliminar el usuario. Tiene ${serviciosTareaAsignados} tareas asignadas.`,
+        suggestion: "Reasigna las tareas a otro usuario antes de eliminar.",
+      });
+    }
+
+    // ✅ Eliminar relación con directorio si existe
+    await prisma.directorios.deleteMany({
+      where: { usuarioId: id },
+    });
+
+    // ✅ Eliminar usuario
+    await prisma.usuario.delete({ where: { id } });
+
+    res.json({ mensaje: "Usuario eliminado correctamente" });
+  } catch (error) {
+    console.error("❌ Error al eliminar usuario:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    res.status(500).json({
+      error: "Error al eliminar usuario",
+      detalle: error.message,
+    });
+  }
+});
+app.delete("/directorios/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    await prisma.directorios.delete({ where: { id } });
+    res.json({ mensaje: "Directorio eliminado correctamente" });
+  } catch (error) {
+    console.error("❌ Error al eliminar directorio:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Directorio no encontrado" });
+    }
+
+    res.status(500).json({
+      error: "Error al eliminar directorio",
+      detalle: error.message,
+    });
+  }
+});
+app.delete("/facturas/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    // ✅ Verificar que la factura no esté pagada
+    const factura = await prisma.facturas.findUnique({
+      where: { id },
+      select: { cobrada: true, estado: true },
+    });
+
+    if (!factura) {
+      return res.status(404).json({ error: "Factura no encontrada" });
+    }
+
+    if (factura.cobrada || factura.estado === "pagado") {
+      return res.status(400).json({
+        error: "No se puede eliminar una factura que ya está pagada",
+        suggestion: "Cambia el estado a 'cancelado' en lugar de eliminar.",
+      });
+    }
+
+    await prisma.facturas.delete({ where: { id } });
+    res.json({ mensaje: "Factura eliminada correctamente" });
+  } catch (error) {
+    console.error("❌ Error al eliminar factura:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Factura no encontrada" });
+    }
+
+    res.status(500).json({
+      error: "Error al eliminar factura",
+      detalle: error.message,
+    });
+  }
+});
+app.delete("/branding/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    await prisma.branding.delete({ where: { id } });
+    res.json({ mensaje: "Branding eliminado correctamente" });
+  } catch (error) {
+    console.error("❌ Error al eliminar branding:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Branding no encontrado" });
+    }
+
+    res.status(500).json({
+      error: "Error al eliminar branding",
+      detalle: error.message,
+    });
+  }
+});
+app.delete("/tareas/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    // ✅ Primero eliminar relaciones en servicios_tarea
+    await prisma.servicios_Tarea.deleteMany({
+      where: { tareaId: id },
+    });
+
+    // ✅ Luego eliminar la tarea
+    await prisma.tareas.delete({ where: { id } });
+
+    res.json({ mensaje: "Tarea eliminada correctamente" });
+  } catch (error) {
+    console.error("❌ Error al eliminar tarea:", error);
+
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Tarea no encontrada" });
+    }
+
+    res.status(500).json({
+      error: "Error al eliminar tarea",
+      detalle: error.message,
+    });
+  }
+});
+app.delete("/materiales/all", async (req, res) => {
+  try {
+    // ✅ Primero eliminar todas las asignaciones
+    await prisma.sT_Material.deleteMany();
+
+    // ✅ Luego eliminar todos los materiales
+    await prisma.materiales.deleteMany();
+
+    res.json({ mensaje: "✅ Todos los materiales eliminados correctamente" });
+  } catch (error) {
+    console.error("[DELETE /materiales/all]", error);
+    res.status(500).json({ error: "Error al eliminar todos los materiales" });
+  }
+});
+app.delete("/servicios/all", async (req, res) => {
+  try {
+    // ✅ Primero eliminar servicios_tarea
+    await prisma.servicios_Tarea.deleteMany();
+
+    // ✅ Luego eliminar todos los servicios
+    await prisma.servicios.deleteMany();
+
+    res.json({ mensaje: "✅ Todos los servicios eliminados correctamente" });
+  } catch (error) {
+    console.error("[DELETE /servicios/all]", error);
+    res.status(500).json({ error: "Error al eliminar todos los servicios" });
+  }
+});
 //////////////////////////////////////////////////////////
 //  PATH
 //////////////////////////////////////////////////////////
@@ -1763,4 +3451,64 @@ app.patch("/servicios_tarea/:id", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Error al asociar tarea", detalle: err });
   }
+});
+app.patch("/directorio/me", requireAuth, async (req, res) => {
+  try {
+    const idUsuario = req.user.id;
+    const {
+      nombre,
+      apellidos,
+      telefono,
+      puesto,
+      tipo,
+      avatarUrl,
+      ubicacion,
+      extension,
+    } = req.body;
+
+    const actualizado = await prisma.usuario.update({
+      where: { idUsuario }, // 👈 ajusta si tu PK es 'id'
+      data: {
+        nombre,
+        apellidos,
+        // ⚠️ Cambia 'directorioEmpleado' por el nombre real de tu relación en Prisma
+        directorioEmpleado: {
+          upsert: {
+            update: { telefono, puesto, tipo, avatarUrl, ubicacion, extension },
+            create: {
+              telefono,
+              puesto,
+              tipo,
+              avatarUrl,
+              ubicacion,
+              extension,
+              usuarioId: idUsuario,
+            },
+          },
+        },
+      },
+      select: {
+        idUsuario: true,
+        email: true,
+        nombre: true,
+        apellidos: true,
+        rol: true,
+        directorioEmpleado: true,
+      },
+    });
+
+    res.json(actualizado);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Error al actualizar perfil" });
+  }
+});
+
+//////////////////////////////////////////////////////////
+// Iniciar servidor
+
+//////////////////////////////////////////////////////////
+
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });

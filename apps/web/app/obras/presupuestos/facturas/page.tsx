@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import TablaListado from "../../../components/TablaListado";
-import styles from "./Facturas.module.css"; // o donde tengas el CSS
+import styles from "./Facturas.module.css";
+import type { Columna } from "../../../components/TablaListado";
 import { useRouter } from "next/navigation";
 
 type Factura = {
@@ -20,7 +21,9 @@ export default function FacturasPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/facturas`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/facturas`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         setFacturas(data);
@@ -36,6 +39,7 @@ export default function FacturasPage() {
     if (confirm(`¿Eliminar Factura "${Factura.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/Facturas/${Factura.id}`, {
         method: "DELETE",
+        credentials: "include",
       })
         .then(() => {
           setFacturas((prev) => prev.filter((o) => o.id !== Factura.id));
@@ -45,10 +49,28 @@ export default function FacturasPage() {
     }
   };
 
-  const columnas = [
+  const columnas: Columna[] = [
     { clave: "referencia", encabezado: "Referencia" },
     { clave: "fecha", encabezado: "Fecha" },
-    { clave: "cobrada", encabezado: "Cobrada" },
+    {
+      clave: "estado",
+      encabezado: "Estado",
+      tipo: "texto",
+      render: (valor: string) => (
+        <span
+          style={{
+            padding: "0.25rem 0.5rem",
+            borderRadius: "4px",
+            fontSize: "0.8rem",
+            fontWeight: "bold",
+            backgroundColor: valor === "pagado" ? "#d1fae5" : "#fef3c7",
+            color: valor === "pagado" ? "#065f46" : "#92400e",
+          }}
+        >
+          {valor || "pendiente"}
+        </span>
+      ),
+    },
   ];
 
   return (
@@ -65,9 +87,13 @@ export default function FacturasPage() {
             titulo=""
             columnas={columnas}
             datos={Facturas}
-            onVer={(Facturas) => router.push(`/Facturas/${Facturas.id}`)}
+            onVer={(Facturas) =>
+              router.push(`/obras/presupuestos/facturas/${Facturas.id}`)
+            }
             onEditar={(Facturas) =>
-              router.push(`/Facturas/${Facturas.id}?edit=true`)
+              router.push(
+                `/obras/presupuestos/facturas/${Facturas.id}?edit=true`
+              )
             }
             onEliminar={handleEliminar}
             mostrarImportar={false}

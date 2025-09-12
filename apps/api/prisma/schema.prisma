@@ -49,8 +49,11 @@ model Usuario {
   passwordHash String?
   telefono String?
   tareas   Servicios_Tarea[]     @relation("UsuarioTareas")
-  rol      String    @default("operario")    
+  rolId        Int?   
+  rol          Rol?      @relation(fields: [rolId], references: [id], onDelete: SetNull)    
   activo   Boolean @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt      @map("updated_at")
 }
 
 
@@ -137,6 +140,7 @@ model Tareas {
   descripcion    String
   progreso       Int?
   estadoId       Int?
+  direccion     String?
   estado         Estados?          @relation(fields: [estadoId], references: [id])
   serviciosTarea Servicios_Tarea?  @relation("RelacionTarea")
 }
@@ -159,7 +163,7 @@ model Materiales {
   stockActual Int?
   unidadMedida String? // Ej: kg, m2, litros
   serviciosTarea Servicios_Tarea[]
-  ST_Material ST_Material[]
+  st_material ST_Material[]
 }
 
 model ST_Material{
@@ -175,19 +179,27 @@ model ST_Material{
 }
 model Facturas {
   id             Int               @id @default(autoincrement())
-  referencia      String
-  fecha           DateTime
-  cobrada         Boolean @default(false)
-  cantidad        Int?
-  servicio   Presupuesto_Servicio[]
-  presupuestoId Int
-  Presupuesto       Presupuesto? @relation(fields: [presupuestoId], references: [id])
+  numero         String?           
+  descripcion    String?           
+  referencia     String
+  fecha          DateTime
+  importe        Float?            
+  estado         String            @default("pendiente") 
+  cobrada        Boolean           @default(false)
+  cantidad       Int?
+  presupuestoId  Int
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  
+
+  presupuesto    Presupuesto       @relation(fields: [presupuestoId], references: [id])
+  
 }
 
 model Presupuesto{
   id             Int               @id @default(autoincrement())
   nombre        String
-  descripción   String
+  descripcion   String
   createdAt     DateTime          @default(now())
   aceptado      Boolean @default(false)
   importe       Float     @default(0)
@@ -195,9 +207,9 @@ model Presupuesto{
   descuentoTipo   String    @default("porcentaje") // "porcentaje" o "valor"
   descuentoValor  Float     @default(0)
   clienteId     Int
-  Cliente       Cliente? @relation(fields: [clienteId], references: [id])
+  Cliente       Cliente?    @relation(fields: [clienteId], references: [id])
   obraId        Int
-  Obra       Obra? @relation(fields: [obraId], references: [id])
+  obra       Obra?         @relation(fields: [obraId], references: [id])
   servicios      Presupuesto_Servicio[]
   facturas      Facturas[]
   condiciones  String?
@@ -233,10 +245,8 @@ model Presupuesto_Servicio {
   nombre         String
   presupuestoId  Int
   servicioId     Int
-  facturaId        Int?
   presupuesto    Presupuesto @relation(fields: [presupuestoId], references: [id])
   tareas         Presupuesto_Tarea[]
-  factura    Facturas? @relation(fields: [facturaId], references: [id])
 }
 
 
@@ -286,10 +296,23 @@ model Branding {
   firma         String?
 
 }
+
+model Rol {
+  id          Int     @id @default(autoincrement())
+  nombre      String   @unique @db.VarChar(50)
+  descripcion String?  @db.Text
+  nivel       Int      @default(5)
+  activo      Boolean  @default(true)
+  usuarios    Usuario[]
+  permisos    Json     @default("{}") // JSONB en PostgreSQL
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+}
 model Modulo {
   id          Int       @id @default(autoincrement())
   nombre      String
   icono       String?
+  activo      Boolean?
   ruta        String?
   orden       Int?
   padreId     Int?                     // Clave foránea

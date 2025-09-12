@@ -20,7 +20,9 @@ export default function DirectoriosPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/Directorios`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/Directorios`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         setDirectorios(data);
@@ -36,6 +38,7 @@ export default function DirectoriosPage() {
     if (confirm(`¿Eliminar Directorio "${Directorio.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/Directorios/${Directorio.id}`, {
         method: "DELETE",
+        credentials: "include",
       })
         .then(() => {
           setDirectorios((prev) => prev.filter((o) => o.id !== Directorio.id));
@@ -95,7 +98,10 @@ export default function DirectoriosPage() {
             importUrl={`${process.env.NEXT_PUBLIC_API_URL}/Directorios`}
             onImport={async () => {
               const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/Directorios`
+                `${process.env.NEXT_PUBLIC_API_URL}/Directorios`,
+                {
+                  credentials: "include",
+                }
               );
               const nuevosDatos = await res.json();
               setDirectorios(nuevosDatos);

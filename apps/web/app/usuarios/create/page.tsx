@@ -1,37 +1,32 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import FormularioTabla from '../../components/FormularioTabla';
-
-
-
-
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import FormularioTabla from "../../components/FormularioTabla";
 
 const campos = [
-   {nombre: 'idUsuario', etiqueta: 'Id Usuario' },
-  { nombre: 'nombre', etiqueta: 'Nombre' },
-  { nombre: 'apellido', etiqueta: 'Apellido' },
-  { nombre: 'email', etiqueta: 'Email'},
-  { nombre: 'password', etiqueta: 'Contraseña'},
-  { nombre: 'telefono', etiqueta: 'Teléfono'},
-  { nombre: 'rol', etiqueta: 'Roles' },
-  {nombre: 'activo',etiqueta: 'Activo', tipo: 'checkbox'},
-
+  { nombre: "idUsuario", etiqueta: "Id Usuario" },
+  { nombre: "nombre", etiqueta: "Nombre" },
+  { nombre: "apellido", etiqueta: "Apellido" },
+  { nombre: "email", etiqueta: "Email" },
+  { nombre: "password", etiqueta: "Contraseña" },
+  { nombre: "telefono", etiqueta: "Teléfono" },
+  { nombre: "rol", etiqueta: "Roles" },
+  { nombre: "activo", etiqueta: "Activo", tipo: "checkbox" },
 ];
 
 export default function Nuevausuario() {
   const router = useRouter();
 
   const [valores, setValores] = useState({
-    nombre: '',
-    apellido: '',
-    activo: '',
-    password: '',
-    telefono: '',
-    rol: '',
-    email: '',
-    idUsuario:'',
+    nombre: "",
+    apellido: "",
+    activo: "",
+    password: "",
+    telefono: "",
+    rol: "",
+    email: "",
+    idUsuario: "",
   });
 
   const handleChange = (nombre: string, valor: any) => {
@@ -40,16 +35,17 @@ export default function Nuevausuario() {
 
   const handleSubmit = async () => {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/usuarios`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(valores),
+      credentials: "include",
     });
 
     if (res.ok) {
-      alert('usuario creada correctamente');
-      router.push('/usuarios');
+      alert("usuario creada correctamente");
+      router.push("/usuarios");
     } else {
-      alert('Error al crear la usuario');
+      alert("Error al crear la usuario");
     }
   };
 

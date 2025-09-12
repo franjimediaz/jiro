@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import TablaListado from "../components/TablaListado";
 import styles from "./Obras.module.css"; // o donde tengas el CSS
 import { useRouter } from "next/navigation";
+import { RequirePermiso, usePermisos } from "../lib/permisos";
 
 type Obra = {
   id: number;
@@ -20,7 +21,9 @@ export default function ObrasPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         setObras(data);
@@ -36,6 +39,7 @@ export default function ObrasPage() {
     if (confirm(`¿Eliminar obra "${obra.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras/${obra.id}`, {
         method: "DELETE",
+        credentials: "include",
       })
         .then(() => {
           setObras((prev) => prev.filter((o) => o.id !== obra.id));
@@ -104,7 +108,10 @@ export default function ObrasPage() {
             importUrl={`${process.env.NEXT_PUBLIC_API_URL}/obras`}
             onImport={async () => {
               const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/obras`
+                `${process.env.NEXT_PUBLIC_API_URL}/obras`,
+                {
+                  credentials: "include",
+                }
               );
               const nuevosDatos = await res.json();
               setObras(nuevosDatos);

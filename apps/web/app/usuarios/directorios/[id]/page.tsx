@@ -170,7 +170,9 @@ export default function VerEditarUsuario() {
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/usuarios/${id}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/usuarios/${id}`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         setValores(data);
@@ -193,6 +195,7 @@ export default function VerEditarUsuario() {
       `${process.env.NEXT_PUBLIC_API_URL}/Usuarios/${id}`,
       {
         method: "PUT",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(valores),
       }

@@ -791,7 +791,7 @@
   border-right: 1px solid #e2e8f0;
 }
 .formularioTabla tr:has(.selectorTablaWrapper) {
-  z-index: 1000;
+  z-index: 90;
   position: relative;
 }
 .seccion .campo {
@@ -800,16 +800,16 @@
 }
 .selectorTablaWrapper {
   position: relative;
-  z-index: 1000; /* ✅ Z-index muy alto para que esté por encima de todo */
+  z-index: 90; /* ✅ Z-index muy alto para que esté por encima de todo */
 }
 .campo:has(.selectorTablaWrapper) {
   position: relative;
-  z-index: 1000;
+  z-index: 90;
   overflow: visible;
 }
 .campo .selectorTablaWrapper {
   position: relative;
-  z-index: 1001;
+  z-index: 91;
 }
 
 /* ===== ANIMACIONES PARA SECCIONES ===== */

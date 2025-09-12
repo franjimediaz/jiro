@@ -1,10 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import TablaListado from '../../components/TablaListado';
-import styles from './Estados.module.css'; // o donde tengas el CSS
-import { useRouter } from 'next/navigation';
-
+import { useEffect, useState } from "react";
+import TablaListado from "../../components/TablaListado";
+import styles from "./Estados.module.css"; // o donde tengas el CSS
+import { useRouter } from "next/navigation";
 
 type Estado = {
   id: number;
@@ -21,14 +20,16 @@ export default function EstadosPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/estados`)
-      .then(res => res.json())
-      .then(data => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/estados`, {
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((data) => {
         setEstados(data);
         setLoading(false);
       })
-      .catch(err => {
-        console.error('Error al obtener Estados:', err);
+      .catch((err) => {
+        console.error("Error al obtener Estados:", err);
         setLoading(false);
       });
   }, []);
@@ -36,20 +37,21 @@ export default function EstadosPage() {
   const handleEliminar = (Estado: any) => {
     if (confirm(`¿Eliminar Estado "${Estado.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/estados/${Estado.id}`, {
-        method: 'DELETE',
+        method: "DELETE",
+        credentials: "include",
       })
         .then(() => {
           setEstados((prev) => prev.filter((o) => o.id !== Estado.id));
-          alert('Estado eliminada');
+          alert("Estado eliminada");
         })
-        .catch(() => alert('Error al eliminar'));
+        .catch(() => alert("Error al eliminar"));
     }
   };
 
   const columnas = [
-    { clave: 'nombre', encabezado: 'Nombre' },
-    { clave: 'color', encabezado: 'Color' },
-    { clave: 'icono', encabezado: 'Icono' },
+    { clave: "nombre", encabezado: "Nombre" },
+    { clave: "color", encabezado: "Color" },
+    { clave: "icono", encabezado: "Icono" },
   ];
 
   return (
@@ -59,7 +61,7 @@ export default function EstadosPage() {
           <h1>Listado de Estados</h1>
           <button
             className={styles.botonCrear}
-            onClick={() => router.push('estados/create')}
+            onClick={() => router.push("estados/create")}
           >
             + Crear Estado
           </button>
@@ -73,7 +75,9 @@ export default function EstadosPage() {
             columnas={columnas}
             datos={Estados}
             onVer={(Estados) => router.push(`/system/estados/${Estados.id}`)}
-            onEditar={(Estados) => router.push(`/system/estados/${Estados.id}?edit=true`)}
+            onEditar={(Estados) =>
+              router.push(`/system/estados/${Estados.id}?edit=true`)
+            }
             onEliminar={handleEliminar}
           />
         )}
@@ -81,4 +85,3 @@ export default function EstadosPage() {
     </main>
   );
 }
-

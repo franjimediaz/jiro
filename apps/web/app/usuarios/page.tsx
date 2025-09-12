@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import TablaListado from "../components/TablaListado";
 import styles from "./Usuarios.module.css"; // o donde tengas el CSS
 import { useRouter } from "next/navigation";
+import type { Columna } from "../components/TablaListado";
 
 type usuario = {
   id: number;
@@ -20,7 +21,9 @@ export default function usuariosPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/usuarios`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/usuarios`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         setusuarios(data);
@@ -36,6 +39,7 @@ export default function usuariosPage() {
     if (confirm(`¿Eliminar usuario "${usuario.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/usuarios/${usuario.id}`, {
         method: "DELETE",
+        credentials: "include",
       })
         .then(() => {
           setusuarios((prev) => prev.filter((o) => o.id !== usuario.id));
@@ -45,11 +49,11 @@ export default function usuariosPage() {
     }
   };
 
-  const columnas = [
+  const columnas: Columna[] = [
     { clave: "nombre", encabezado: "Nombre" },
     { clave: "apellido", encabezado: "Apellido" },
     { clave: "idUsuario", encabezado: "ID Usuario" },
-    { clave: "activo", encabezado: "Activo" },
+    { clave: "activo", encabezado: "Activo", tipo: "checkbox" },
   ];
   const exportC = [
     { clave: "id", encabezado: "ID" },
@@ -93,7 +97,10 @@ export default function usuariosPage() {
             importUrl={`${process.env.NEXT_PUBLIC_API_URL}/usuarios`}
             onImport={async () => {
               const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/usuarios`
+                `${process.env.NEXT_PUBLIC_API_URL}/usuarios`,
+                {
+                  credentials: "include",
+                }
               );
               const nuevosDatos = await res.json();
               setusuarios(nuevosDatos);

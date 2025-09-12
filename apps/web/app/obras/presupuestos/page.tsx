@@ -28,7 +28,9 @@ export default function PresupuestosPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/Presupuestos`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/Presupuestos`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         setPresupuestos(data);
@@ -46,6 +48,7 @@ export default function PresupuestosPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/Presupuestos/${Presupuesto.id}`,
         {
           method: "DELETE",
+          credentials: "include",
         }
       )
         .then(() => {

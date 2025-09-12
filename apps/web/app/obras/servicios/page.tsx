@@ -20,7 +20,9 @@ export default function ServiciosPage() {
   const router = useRouter(); // ← Aquí
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios`, {
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data) => {
         setServicios(data);
@@ -36,6 +38,7 @@ export default function ServiciosPage() {
     if (confirm(`¿Eliminar Servicio "${Servicio.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios/${Servicio.id}`, {
         method: "DELETE",
+        credentials: "include",
       })
         .then(() => {
           setServicios((prev) => prev.filter((o) => o.id !== Servicio.id));
@@ -90,7 +93,10 @@ export default function ServiciosPage() {
             importUrl={`${process.env.NEXT_PUBLIC_API_URL}/servicios`}
             onImport={async () => {
               const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/servicios`
+                `${process.env.NEXT_PUBLIC_API_URL}/servicios`,
+                {
+                  credentials: "include",
+                }
               );
               const nuevosDatos = await res.json();
               setServicios(nuevosDatos);
