@@ -1,8 +1,3 @@
-// 📄 apps/web/app/components/ClientLayout.tsx
-
-//<main style={{ marginLeft: mostrarSidebar ? 220 : 0, padding: '2rem' }}>
-//        {children}
-//      </main>
 "use client";
 
 import { usePathname } from "next/navigation";
@@ -16,22 +11,26 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+
+  // Rutas donde NO mostramos sidebar
   const rutasSinSidebar = ["/login", "/register", "/reset-password"];
   const esLogin = pathname === "/login";
-
   const mostrarSidebar = !rutasSinSidebar.includes(pathname);
 
   return (
-    <>
+    <PermisosProvider>
       {mostrarSidebar && <Sidebar />}
+
       <main
         style={{
+          // Si hay sidebar, dejamos margen; si no, a 0
           marginLeft: mostrarSidebar && !esLogin ? 220 : 0,
+          // En login quitamos padding
           padding: !esLogin ? "2rem" : 0,
         }}
       >
-        <PermisosProvider>{children}</PermisosProvider>
+        {children}
       </main>
-    </>
+    </PermisosProvider>
   );
 }

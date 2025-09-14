@@ -3,21 +3,23 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import FormularioTabla from "../../../components/FormularioTabla";
+import { RequirePermiso } from "../../../lib/permisos";
 
-{
-  /** model Modulo {
-  id          Int       @id @default(autoincrement())
-  nombre      String
-  icono       String?
-  ruta        String?
-  orden       Int?
-  padreId     Int?                     // Clave foránea
-  padre       Modulo?   @relation("ModuloJerarquia", fields: [padreId], references: [id])
-  hijos       Modulo[]  @relation("ModuloJerarquia") // Relación inversa
-} */
+/*
+model Modulo {
+  id       Int      @id @default(autoincrement())
+  nombre   String
+  icono    String?
+  ruta     String?
+  orden    Int?
+  padreId  Int?
+  padre    Modulo?  @relation("ModuloJerarquia", fields: [padreId], references: [id])
+  hijos    Modulo[] @relation("ModuloJerarquia")
+  activo   Boolean?
 }
+*/
 
-const campos = [
+const secciones = [
   {
     titulo: "Identificación",
     descripcion: "",
@@ -34,51 +36,51 @@ const campos = [
         campoValue: "id",
       },
       { nombre: "ruta", etiqueta: "Ruta", tipo: "text", readOnly: true },
-      { nombre: "orden", etiqueta: "Orden", tipo: "numero", readOnly: true },
-      { nombre: "nombre", etiqueta: "Nombre del Modulo", tipo: "text" },
+      { nombre: "orden", etiqueta: "Orden", tipo: "number", readOnly: true },
+      { nombre: "nombre", etiqueta: "Nombre del Módulo", tipo: "text" },
       { nombre: "icono", etiqueta: "Icono", tipo: "icono" },
       { nombre: "activo", etiqueta: "Activo", tipo: "checkbox" },
-    ],
-  },
-  {
-    titulo: "Permisos",
-    descripcion: "Configuración de permisos para el módulo",
-    expandible: true,
-    expandidaPorDefecto: true,
-    campos: [
-      { nombre: "crear", etiqueta: "Crear", tipo: "checkbox" },
-      { nombre: "leer", etiqueta: "Leer", tipo: "checkbox" },
-      { nombre: "actualizar", etiqueta: "Actualizar", tipo: "checkbox" },
-      { nombre: "eliminar", etiqueta: "Eliminar", tipo: "checkbox" },
     ],
   },
 ];
 
 export default function VerEditarModulo() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
 
   const modoEdicion = searchParams.get("edit") === "true";
-  const [valores, setValores] = useState({
+
+  const [valores, setValores] = useState<{
+    nombre: string;
+    ruta: string;
+    icono: string;
+    orden: string | number | null;
+    padreId: string | number | null;
+    activo: boolean;
+    // Visual only (no backend mapping here)
+  }>({
     nombre: "",
     ruta: "",
     icono: "",
     orden: "",
     padreId: "",
+    activo: true,
   });
+
   const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
-    // ✅ Validar que existe el ID antes de hacer el fetch
     if (!id) {
       setCargando(false);
       return;
     }
 
+    let cancelado = false;
+
     const cargarModulo = async () => {
       try {
-        // ✅ Usar la URL correcta de tu API
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/modulos/${id}`,
           {
@@ -86,32 +88,53 @@ export default function VerEditarModulo() {
           }
         );
 
-        if (res.ok) {
-          const data = await res.json();
-          // ✅ Convertir valores para el formulario
-          setValores({
-            nombre: data.nombre || "",
-            ruta: data.ruta || "",
-            icono: data.icono || "",
-            orden: data.orden ? data.orden.toString() : "",
-            padreId: data.padreId ? data.padreId.toString() : "",
-          });
-        } else {
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (res.status === 403) {
+          router.replace("/403");
+          return;
+        }
+
+        if (!res.ok) {
           console.error("Error al obtener módulo:", res.status);
-          alert("Módulo no encontrado");
           router.push("/system/modulos");
+          return;
+        }
+
+        const data = await res.json();
+
+        if (!cancelado) {
+          setValores({
+            nombre: data?.nombre ?? "",
+            ruta: data?.ruta ?? "",
+            icono: data?.icono ?? "",
+            orden:
+              typeof data?.orden === "number"
+                ? data.orden
+                : (data?.orden ?? ""),
+            padreId:
+              typeof data?.padreId === "number"
+                ? data.padreId
+                : (data?.padreId ?? ""),
+            activo: data?.activo ?? true,
+          });
+          setCargando(false);
         }
       } catch (err) {
         console.error("Error al obtener Módulo:", err);
-        alert("Error de conexión");
         router.push("/system/modulos");
       } finally {
-        setCargando(false);
+        if (!cancelado) setCargando(false);
       }
     };
 
     cargarModulo();
-  }, [id, router]); // ✅ Agregar dependencias correctas
+    return () => {
+      cancelado = true;
+    };
+  }, [id, router]);
 
   const handleChange = (nombre: string, valor: any) => {
     setValores((prev) => ({ ...prev, [nombre]: valor }));
@@ -119,13 +142,22 @@ export default function VerEditarModulo() {
 
   const handleSubmit = async () => {
     try {
-      // ✅ Preparar datos con tipos correctos
-      const datosParaEnviar = {
+      setGuardando(true);
+
+      const payload = {
         nombre: valores.nombre,
         ruta: valores.ruta || null,
         icono: valores.icono || null,
-        orden: valores.orden ? Number(valores.orden) : null,
-        padreId: valores.padreId ? Number(valores.padreId) : null,
+        orden:
+          valores.orden === "" || valores.orden === null
+            ? null
+            : Number(valores.orden),
+        padreId:
+          valores.padreId === "" || valores.padreId === null
+            ? null
+            : Number(valores.padreId),
+        activo: Boolean(valores.activo),
+        // Nota: los flags de "permisos" son visuales aquí y no se envían.
       };
 
       const res = await fetch(
@@ -134,35 +166,59 @@ export default function VerEditarModulo() {
           method: "PUT",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(datosParaEnviar),
+          body: JSON.stringify(payload),
         }
       );
 
-      if (res.ok) {
-        alert("Módulo actualizado correctamente");
-        router.push("/system/modulos"); // ✅ Ruta correcta
-      } else {
-        const error = await res.json();
-        alert(`Error al actualizar: ${error.error || "Error desconocido"}`);
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
       }
+      if (res.status === 403) {
+        router.replace("/403");
+        return;
+      }
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error?.error || "Error al actualizar");
+      }
+
+      alert("Módulo actualizado correctamente");
+      router.push("/system/modulos");
     } catch (error) {
       console.error("Error al actualizar:", error);
-      alert("Error de conexión al actualizar");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Error de conexión al actualizar"
+      );
+    } finally {
+      setGuardando(false);
     }
   };
-  if (cargando) return <p>Cargando Modulo...</p>;
+
+  if (cargando) return <p>Cargando Módulo...</p>;
+
+  const accionNecesaria = modoEdicion ? "editar" : "ver";
 
   return (
-    <>
+    <RequirePermiso modulo="modulos" accion={accionNecesaria} fallback={null}>
       <FormularioTabla
-        titulo={modoEdicion ? "Editar Modulo" : "Detalle del Modulo"}
-        secciones={campos}
+        titulo={modoEdicion ? "Editar Módulo" : "Detalle del Módulo"}
+        secciones={secciones}
         valores={valores}
         onChange={modoEdicion ? handleChange : undefined}
-        onSubmit={modoEdicion ? handleSubmit : undefined}
-        botonTexto="Guardar cambios"
+        onSubmit={modoEdicion && !guardando ? handleSubmit : undefined}
+        botonTexto={
+          modoEdicion
+            ? guardando
+              ? "Guardando..."
+              : "Guardar cambios"
+            : undefined
+        }
         soloLectura={!modoEdicion}
       />
-    </>
+    </RequirePermiso>
   );
 }

@@ -20,7 +20,35 @@ const allowedOrigins = [
   "http://localhost:3001",
   "http://dominio.com",
 ];
+function toNullableString(v) {
+  if (v === undefined || v === null) return null;
+  const s = String(v).trim();
+  return s === "" ? null : s;
+}
 
+function toIntOrNull(v) {
+  const s = toNullableString(v);
+  if (s === null) return null;
+  const n = Number(s);
+  return Number.isNaN(n) ? null : Math.trunc(n);
+}
+
+function toDecimalStringOrNull(v) {
+  const s = toNullableString(v);
+  if (s === null) return null;
+  const norm = s.replace(",", ".");
+  return /^-?\d+(\.\d+)?$/.test(norm) ? norm : null;
+}
+
+function toBoolOrUndefined(v) {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const t = v.toLowerCase();
+    if (t === "true") return true;
+    if (t === "false") return false;
+  }
+  return undefined; // deja que Prisma aplique defaults
+}
 function requireAuth(req, res, next) {
   try {
     const token = req.cookies?.token; // login guarda 'token'
@@ -891,30 +919,47 @@ app.get("/obras/count", async (req, res) => {
 });
 app.get("/directorios", async (req, res) => {
   try {
-    const directorios = await prisma.directorios.findMany();
-    res.json(directorios);
-  } catch (error) {
-    res.status(500).json({ error: "Error al obtener directorios" });
+    const { usuarioId } = req.query;
+
+    if (usuarioId !== undefined) {
+      const uid = Number(usuarioId);
+      if (Number.isNaN(uid))
+        return res.status(400).json({ error: "usuarioId inválido" });
+
+      const uno = await prisma.directorios.findUnique({
+        where: { usuarioId: uid },
+      });
+      if (!uno)
+        return res
+          .status(404)
+          .json({ error: "No hay directorio para ese usuario" });
+      return res.json(uno);
+    }
+
+    // … tu listado general (paginado, filtros, etc.)
+    const lista = await prisma.directorios.findMany({
+      take: 50,
+      orderBy: { createdAt: "desc" },
+    });
+    return res.json(lista);
+  } catch (e) {
+    console.error("[GET /directorios] Error:", e);
+    return res.status(500).json({ error: "Error obteniendo directorios" });
   }
 });
 app.get("/directorios/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-
-  if (isNaN(id)) {
-    return res.status(400).json({ error: "ID inválido" });
-  }
-
   try {
-    console.log("🧪 Buscando directorios con ID:", id);
-    const directorio = await prisma.directorios.findUnique({ where: { id } });
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "id inválido" });
 
-    if (!directorio)
+    const dir = await prisma.directorios.findUnique({ where: { id } });
+    if (!dir)
       return res.status(404).json({ error: "Directorio no encontrado" });
 
-    res.json(directorio);
-  } catch (error) {
-    console.error("❌ Error exacto:", error);
-    res.status(500).json({ error: "Error al obtener Directorio" });
+    return res.json(dir);
+  } catch (e) {
+    console.error("[GET /directorios/:id] Error:", e);
+    return res.status(500).json({ error: "Error obteniendo directorio" });
   }
 });
 app.get("/modulos", async (req, res) => {
@@ -1766,114 +1811,287 @@ app.post("/usuarios", async (req, res) => {
   }
 });
 app.post("/directorios", async (req, res) => {
-  const {
-    id,
-    tipo,
-    estado,
-    nombre,
-    apellidos,
-    displayName,
-    dni,
-    email,
-    emailPersonal,
-    telefono,
-    telefono2,
-    fotoUrl,
-    puesto,
-    departamentoId,
-    departamento,
-    supervisorId,
-    supervisor,
-    subordinados,
-    rol,
-    jornada,
-    turno,
-    empresaExternaId,
-    empresaExterna,
-    usuarioId,
-    calendarEmail,
-    costeHora,
-    tarifaFacturacionHora,
-    moneda,
-    capacidadSemanalHoras,
-    tienePRL,
-    prlVencimiento,
-    rcVigente,
-    rcVencimiento,
-    ubicacionCiudad,
-    ubicacionProvincia,
-    ubicacionPais,
-    fechaAlta,
-    fechaBaja,
-    observaciones,
-    tags,
-  } = req.body;
-
-  if (!nombre || !apellido || !email) {
-    return res.status(400).json({ error: "Faltan campos obligatorios" });
-  }
-
   try {
-    const existente = await prisma.directorio.findUnique({ where: { email } });
-    if (existente)
+    const {
+      // ⇩ del body (muchos pueden venir vacíos como '')
+      tipo,
+      estado,
+      nombre,
+      apellidos,
+      displayName,
+      dni,
+      email,
+      emailPersonal,
+      telefono,
+      telefono2,
+      fotoUrl,
+      puesto,
+      departamentoId,
+      supervisorId,
+      rol,
+      jornada,
+      turno,
+      empresaExternaId,
+      usuarioId,
+      calendarEmail,
+      costeHora,
+      tarifaFacturacionHora,
+      moneda,
+      capacidadSemanalHoras,
+      tienePRL,
+      prlVencimiento,
+      rcVigente,
+      rcVencimiento,
+      ubicacionCiudad,
+      ubicacionProvincia,
+      ubicacionPais,
+      fechaBaja,
+      observaciones,
+      tags,
+      // id, subordinados, fechaAlta (no usamos: cuid() + defaults)
+    } = req.body;
+
+    // 1) Obligatorios mínimos
+    if (!nombre || !apellidos || !email) {
+      return res.status(400).json({
+        error: "Faltan campos obligatorios: nombre, apellidos, email",
+      });
+    }
+
+    // 2) Normalizaciones (evitar "" en únicos, enteros y decimales)
+    const usuarioIdParsed = toIntOrNull(usuarioId); // Int o null
+    const capacidadSemanalHorasParsed = toIntOrNull(capacidadSemanalHoras);
+    const dniNorm = toNullableString(dni); // "" -> null (evita duplicado de cadena vacía)
+    const costeHoraNorm = toDecimalStringOrNull(costeHora); // "" -> null; "222" ok
+    const tarifaHoraNorm = toDecimalStringOrNull(tarifaFacturacionHora);
+    const departamentoIdNorm = toNullableString(departamentoId);
+    const supervisorIdNorm = toIntOrNull(supervisorId);
+    const empresaExternaIdNorm = toNullableString(empresaExternaId);
+    const monedaNorm = toNullableString(moneda); // undefined respeta default("EUR")
+    const tienePRLBool = toBoolOrUndefined(tienePRL);
+    const rcVigenteBool = toBoolOrUndefined(rcVigente);
+    const estadoBool = toBoolOrUndefined(estado);
+
+    // 3) Unicidades
+    const existeEmail = await prisma.directorios.findUnique({
+      where: { email },
+    });
+    if (existeEmail)
       return res
-        .status(400)
+        .status(409)
         .json({ error: "Ya existe un directorio con ese email" });
 
-    const nuevoDirectorio = await prisma.directorio.create({
+    if (dniNorm) {
+      const existeDni = await prisma.directorios.findUnique({
+        where: { dni: dniNorm },
+      });
+      if (existeDni)
+        return res
+          .status(409)
+          .json({ error: "Ya existe un directorio con ese DNI" });
+    }
+
+    // 4) Verificación de FKs (evita P2003)
+    if (usuarioIdParsed !== null) {
+      const userOK = await prisma.usuario.findUnique({
+        where: { id: usuarioIdParsed },
+        select: { id: true },
+      });
+      if (!userOK)
+        return res.status(400).json({ error: "usuarioId no existe" });
+
+      // 1:1 — que no esté ya vinculado
+      const yaVinculado = await prisma.directorios.findFirst({
+        where: { usuarioId: usuarioIdParsed },
+        select: { id: true },
+      });
+      if (yaVinculado)
+        return res
+          .status(409)
+          .json({ error: "Ese usuario ya tiene un directorio vinculado" });
+    }
+
+    if (supervisorIdNorm) {
+      const supOK = await prisma.directorios.findUnique({
+        where: { id: supervisorIdNorm },
+        select: { id: true },
+      });
+      if (!supOK)
+        return res.status(400).json({ error: "supervisorId no existe" });
+    }
+    if (departamentoIdNorm) {
+      const depOK = await prisma.departamento.findUnique({
+        where: { id: departamentoIdNorm },
+        select: { id: true },
+      });
+      if (!depOK)
+        return res.status(400).json({ error: "departamentoId no existe" });
+    }
+    if (empresaExternaIdNorm) {
+      const empOK = await prisma.empresaExterna.findUnique({
+        where: { id: empresaExternaIdNorm },
+        select: { id: true },
+      });
+      if (!empOK)
+        return res.status(400).json({ error: "empresaExternaId no existe" });
+    }
+
+    // 5) Crear (sin id del body, para usar cuid())
+    const nuevo = await prisma.directorios.create({
       data: {
-        id,
-        tipo,
-        estado,
+        tipo: toNullableString(tipo),
+        estado: estadoBool, // undefined → respeta default; null guardaría null
+
         nombre,
         apellidos,
-        displayName,
-        dni,
+        displayName: toNullableString(displayName),
+
+        dni: dniNorm,
         email,
-        emailPersonal,
-        telefono,
-        telefono2,
-        fotoUrl,
-        puesto,
-        departamentoId,
-        departamento,
-        supervisorId,
-        supervisor,
-        subordinados,
-        rol,
-        jornada,
-        turno,
-        empresaExternaId,
-        empresaExterna,
-        usuarioId,
-        calendarEmail,
-        costeHora,
-        tarifaFacturacionHora,
-        moneda,
-        capacidadSemanalHoras,
-        tienePRL,
-        prlVencimiento,
-        rcVigente,
-        rcVencimiento,
-        ubicacionCiudad,
-        ubicacionProvincia,
-        ubicacionPais,
-        fechaAlta,
-        fechaBaja,
-        observaciones,
-        tags,
+        emailPersonal: toNullableString(emailPersonal),
+        telefono: toNullableString(telefono),
+        telefono2: toNullableString(telefono2),
+        fotoUrl: toNullableString(fotoUrl),
+
+        puesto: toNullableString(puesto),
+        departamentoId: departamentoIdNorm,
+        supervisorId: supervisorIdNorm,
+
+        rol: toNullableString(rol),
+        jornada: toNullableString(jornada),
+        turno: toNullableString(turno),
+
+        empresaExternaId: empresaExternaIdNorm,
+
+        usuarioId: usuarioIdParsed, // Int|null
+
+        calendarEmail: toNullableString(calendarEmail),
+
+        costeHora: costeHoraNorm, // string|null (Decimal)
+        tarifaFacturacionHora: tarifaHoraNorm,
+        moneda: monedaNorm === null ? undefined : monedaNorm, // undefined respeta default("EUR")
+        capacidadSemanalHoras: capacidadSemanalHorasParsed,
+
+        tienePRL: tienePRLBool, // undefined respeta default(false)
+        prlVencimiento: toNullableString(prlVencimiento)
+          ? new Date(prlVencimiento)
+          : null,
+        rcVigente: rcVigenteBool,
+        rcVencimiento: toNullableString(rcVencimiento)
+          ? new Date(rcVencimiento)
+          : null,
+
+        ubicacionCiudad: toNullableString(ubicacionCiudad),
+        ubicacionProvincia: toNullableString(ubicacionProvincia),
+        ubicacionPais: toNullableString(ubicacionPais),
+
+        fechaBaja: toNullableString(fechaBaja) ? new Date(fechaBaja) : null,
+        observaciones: toNullableString(observaciones),
+
+        tags: Array.isArray(tags) ? tags : [],
       },
+      select: { id: true, email: true, usuarioId: true },
     });
 
-    res.status(201).json({
-      mensaje: "Directorio creado con éxito",
-      directorio: { id: nuevoDirectorio.id, email: nuevoDirectorio.email },
-    });
+    return res
+      .status(201)
+      .json({ mensaje: "Directorio creado con éxito", directorio: nuevo });
   } catch (error) {
+    // Manejo de errores Prisma en JS puro
+    if (error && typeof error === "object" && "code" in error) {
+      const code = error.code;
+      console.error("Prisma code:", code, "meta:", error.meta);
+      if (code === "P2002")
+        return res
+          .status(409)
+          .json({ error: "Registro duplicado", meta: error.meta });
+      if (code === "P2003")
+        return res
+          .status(400)
+          .json({ error: "FK no válida", meta: error.meta });
+      if (code === "P2025")
+        return res
+          .status(404)
+          .json({ error: "Registro no encontrado", meta: error.meta });
+    }
     console.error("Error creando directorio:", error);
-    res.status(500).json({ error: "Error al crear directorio" });
+    return res.status(500).json({ error: "Error al crear directorio" });
   }
 });
+app.post("/usuarios/:id/directorio", async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ error: "id de usuario inválido" });
+    }
+
+    // 1) Cargar usuario + su rol + si ya tiene directorio
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: userId },
+      include: { rol: true, directorio: true },
+    });
+
+    if (!usuario)
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    if (usuario.directorio) {
+      return res
+        .status(409)
+        .json({ error: "Este usuario ya tiene un directorio vinculado" });
+    }
+
+    // 2) Prevenir conflicto por email único en Directorios
+    const existeEmail = await prisma.directorios.findUnique({
+      where: { email: usuario.email },
+    });
+    if (existeEmail) {
+      return res.status(409).json({
+        error: "Ya existe un directorio con ese email",
+      });
+    }
+
+    // 3) Preparar datos
+    const rolNombre = usuario.rol?.nombre ?? null;
+    const displayName =
+      `${usuario.nombre ?? ""} ${usuario.apellido ?? ""}`.trim();
+
+    // 4) Crear Directorio (usa defaults: fechaAlta now, moneda "EUR", etc.)
+    const nuevo = await prisma.directorios.create({
+      data: {
+        estado: true,
+        nombre: usuario.nombre,
+        apellidos: usuario.apellido,
+        email: usuario.email,
+        displayName: displayName || null,
+        rol: rolNombre, // ← nombre del rol; en Usuario guardas rolId
+        usuarioId: usuario.id, // ← 1:1
+        // Puedes copiar teléfono si quieres:
+        telefono: usuario.telefono ?? null,
+        // El resto de campos quedan null/default
+        tags: [],
+      },
+      select: { id: true, email: true, usuarioId: true },
+    });
+
+    return res.status(201).json({
+      mensaje: "Directorio creado con éxito",
+      directorio: nuevo,
+    });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error) {
+      const code = error.code;
+      console.error("Prisma code:", code, "meta:", error.meta);
+      if (code === "P2002")
+        return res
+          .status(409)
+          .json({ error: "Campo único duplicado (email/dni/usuarioId)" });
+      if (code === "P2003")
+        return res.status(400).json({ error: "FK no válida" });
+    }
+    console.error("[POST /usuarios/:id/directorio] Error:", error);
+    return res.status(500).json({ error: "Error al crear directorio" });
+  }
+});
+
 app.post("/facturas", async (req, res) => {
   const { presupuestoId, cantidad, servicioIds } = req.body;
 
@@ -2631,123 +2849,140 @@ app.put("/usuarios/:id", async (req, res) => {
   }
 });
 app.put("/directorios/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const {
-    tipo,
-    estado,
-    nombre,
-    apellidos,
-    displayName,
-    dni,
-    email,
-    emailPersonal,
-    telefono,
-    telefono2,
-    fotoUrl,
-    puesto,
-    departamentoId,
-    departamento,
-    supervisorId,
-    supervisor,
-    subordinados,
-    rol,
-    jornada,
-    turno,
-    empresaExternaId,
-    empresaExterna,
-    usuarioId,
-    calendarEmail,
-    costeHora,
-    tarifaFacturacionHora,
-    moneda,
-    capacidadSemanalHoras,
-    tienePRL,
-    prlVencimiento,
-    rcVigente,
-    rcVencimiento,
-    ubicacionCiudad,
-    ubicacionProvincia,
-    ubicacionPais,
-    fechaAlta,
-    fechaBaja,
-    observaciones,
-    tags,
-  } = req.body;
-
-  if (!nombre || !email) {
-    return res
-      .status(400)
-      .json({ error: "Faltan campos obligatorios: nombre, email" });
-  }
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "id inválido" });
 
   try {
-    const directorioActualizado = await prisma.directorios.update({
-      where: { id },
-      data: {
-        tipo,
-        estado,
-        nombre,
-        apellidos,
-        displayName,
-        dni,
-        email,
-        emailPersonal,
-        telefono,
-        telefono2,
-        fotoUrl,
-        puesto,
-        departamentoId: departamentoId ? Number(departamentoId) : null,
-        departamento,
-        supervisorId: supervisorId ? Number(supervisorId) : null,
-        supervisor,
-        subordinados,
-        rol,
-        jornada,
-        turno,
-        empresaExternaId: empresaExternaId ? Number(empresaExternaId) : null,
-        empresaExterna,
-        usuarioId: usuarioId ? Number(usuarioId) : null,
-        calendarEmail,
-        costeHora: costeHora ? parseFloat(costeHora) : null,
-        tarifaFacturacionHora: tarifaFacturacionHora
-          ? parseFloat(tarifaFacturacionHora)
-          : null,
-        moneda,
-        capacidadSemanalHoras: capacidadSemanalHoras
-          ? parseFloat(capacidadSemanalHoras)
-          : null,
-        tienePRL: typeof tienePRL === "boolean" ? tienePRL : null,
-        prlVencimiento: prlVencimiento ? new Date(prlVencimiento) : null,
-        rcVigente: typeof rcVigente === "boolean" ? rcVigente : null,
-        rcVencimiento: rcVencimiento ? new Date(rcVencimiento) : null,
-        ubicacionCiudad,
-        ubicacionProvincia,
-        ubicacionPais,
-        fechaAlta: fechaAlta ? new Date(fechaAlta) : null,
-        fechaBaja: fechaBaja ? new Date(fechaBaja) : null,
-        observaciones,
-        tags,
-      },
-    });
+    const b = req.body;
 
-    res.json(directorioActualizado);
+    const supervisorIdParsed = toIntOrNull(b.supervisorId); // ← ahora INT
+    const usuarioIdParsed = toIntOrNull(b.usuarioId); // INT (ya lo era)
+    const capacidadParsed = toIntOrNull(b.capacidadSemanalHoras);
+    const costeHoraNorm = toDecimalStringOrNull(b.costeHora);
+    const tarifaHoraNorm = toDecimalStringOrNull(b.tarifaFacturacionHora);
+
+    if (supervisorIdParsed && supervisorIdParsed === id)
+      return res
+        .status(400)
+        .json({ error: "Un directorio no puede supervisarse a sí mismo" });
+
+    if (supervisorIdParsed !== null) {
+      const supOK = await prisma.directorios.findUnique({
+        where: { id: supervisorIdParsed },
+        select: { id: true },
+      });
+      if (!supOK)
+        return res.status(400).json({ error: "supervisorId no existe" });
+    }
+
+    if (usuarioIdParsed !== null) {
+      const userOK = await prisma.usuario.findUnique({
+        where: { id: usuarioIdParsed },
+        select: { id: true },
+      });
+      if (!userOK)
+        return res.status(400).json({ error: "usuarioId no existe" });
+      const ocupado = await prisma.directorios.findFirst({
+        where: { usuarioId: usuarioIdParsed, NOT: { id } },
+        select: { id: true },
+      });
+      if (ocupado)
+        return res
+          .status(409)
+          .json({ error: "Ese usuario ya tiene un directorio vinculado" });
+    }
+
+    const data = {
+      ...(b.nombre !== undefined && { nombre: b.nombre }),
+      ...(b.apellidos !== undefined && { apellidos: b.apellidos }),
+      ...(b.email !== undefined && { email: b.email }),
+      ...(b.tipo !== undefined && { tipo: toNullableString(b.tipo) }),
+      ...(b.displayName !== undefined && {
+        displayName: toNullableString(b.displayName),
+      }),
+      ...(b.dni !== undefined && { dni: toNullableString(b.dni) }),
+      ...(b.emailPersonal !== undefined && {
+        emailPersonal: toNullableString(b.emailPersonal),
+      }),
+      ...(b.telefono !== undefined && {
+        telefono: toNullableString(b.telefono),
+      }),
+      ...(b.telefono2 !== undefined && {
+        telefono2: toNullableString(b.telefono2),
+      }),
+      ...(b.fotoUrl !== undefined && { fotoUrl: toNullableString(b.fotoUrl) }),
+      ...(b.puesto !== undefined && { puesto: toNullableString(b.puesto) }),
+      ...(b.rol !== undefined && { rol: toNullableString(b.rol) }),
+      ...(b.jornada !== undefined && { jornada: toNullableString(b.jornada) }),
+      ...(b.turno !== undefined && { turno: toNullableString(b.turno) }),
+      ...(b.calendarEmail !== undefined && {
+        calendarEmail: toNullableString(b.calendarEmail),
+      }),
+
+      // FKs: departamentoId y empresaExternaId SIGUEN siendo String (no tocar)
+      ...(b.departamentoId !== undefined && {
+        departamentoId: toNullableString(b.departamentoId),
+      }),
+      ...(b.empresaExternaId !== undefined && {
+        empresaExternaId: toNullableString(b.empresaExternaId),
+      }),
+
+      // Self-relation INT
+      ...(b.supervisorId !== undefined && { supervisorId: supervisorIdParsed }),
+
+      // 1:1 Usuario INT
+      ...(b.usuarioId !== undefined && { usuarioId: usuarioIdParsed }),
+
+      // Números / Decimales
+      ...(b.capacidadSemanalHoras !== undefined && {
+        capacidadSemanalHoras: capacidadParsed,
+      }),
+      ...(b.costeHora !== undefined && { costeHora: costeHoraNorm }),
+      ...(b.tarifaFacturacionHora !== undefined && {
+        tarifaFacturacionHora: tarifaHoraNorm,
+      }),
+      ...(b.moneda !== undefined && { moneda: toNullableString(b.moneda) }),
+
+      // Booleans
+      ...(b.estado !== undefined && { estado: !!b.estado }),
+      ...(b.tienePRL !== undefined && { tienePRL: !!b.tienePRL }),
+      ...(b.rcVigente !== undefined && { rcVigente: !!b.rcVigente }),
+
+      // Fechas
+      ...(b.prlVencimiento !== undefined && {
+        prlVencimiento: b.prlVencimiento ? new Date(b.prlVencimiento) : null,
+      }),
+      ...(b.rcVencimiento !== undefined && {
+        rcVencimiento: b.rcVencimiento ? new Date(b.rcVencimiento) : null,
+      }),
+      ...(b.fechaBaja !== undefined && {
+        fechaBaja: b.fechaBaja ? new Date(b.fechaBaja) : null,
+      }),
+
+      // Arrays
+      ...(b.tags !== undefined && {
+        tags: Array.isArray(b.tags) ? b.tags : [],
+      }),
+    };
+
+    const updated = await prisma.directorios.update({ where: { id }, data });
+    return res.json(updated);
   } catch (error) {
-    console.error("❌ Error al actualizar directorio:", error);
-
-    if (error.code === "P2025") {
-      return res.status(404).json({ error: "Directorio no encontrado" });
+    console.error("❌ Error al actualizar:", error);
+    if (error && typeof error === "object" && "code" in error) {
+      if (error.code === "P2025")
+        return res.status(404).json({ error: "Directorio no encontrado" });
+      if (error.code === "P2002")
+        return res
+          .status(409)
+          .json({ error: "Campo único duplicado (email/dni/usuarioId)" });
+      if (error.code === "P2003")
+        return res.status(400).json({ error: "FK no válida" });
     }
-
-    if (error.code === "P2002") {
-      return res.status(400).json({ error: "Email ya existe en directorio" });
-    }
-
-    res.status(500).json({
-      error: "Error al actualizar directorio",
-      detalle: error.message,
-    });
+    return res.status(500).json({ error: "Error al actualizar directorio" });
   }
 });
+
 app.put("/st_material/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   const {

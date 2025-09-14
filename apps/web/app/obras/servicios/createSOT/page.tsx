@@ -1,7 +1,9 @@
 "use client";
+
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import FormularioTabla from "../../../components/FormularioTabla";
+import { RequirePermiso } from "../../../lib/permisos";
 
 const campos = [
   {
@@ -27,6 +29,7 @@ export default function CrearServicioObra() {
     fechaInicio: "",
     fechaFin: "",
   });
+  const [enviando, setEnviando] = useState(false);
 
   const handleChange = (nombre: string, valor: any) => {
     setValores((prev: any) => ({ ...prev, [nombre]: valor }));
@@ -37,9 +40,14 @@ export default function CrearServicioObra() {
       alert("Falta el ID de la obra.");
       return;
     }
+    if (!valores.servicioId) {
+      alert("Debes seleccionar un servicio.");
+      return;
+    }
 
+    setEnviando(true);
     try {
-      // Paso 1: Crear la tarea vacía
+      // 1) Crear la tarea “vacía”
       const resTarea = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/obras/tareas`,
         {
@@ -49,57 +57,82 @@ export default function CrearServicioObra() {
           body: JSON.stringify({
             nombre: "Tarea sin nombre",
             descripcion: "Descripción pendiente",
-            estadoId: 1, // o el ID de estado por defecto
+            estadoId: 1, // ajusta si tienes otro estado por defecto
           }),
         }
       );
 
+      if (resTarea.status === 401) {
+        if (typeof window !== "undefined") window.location.href = "/login";
+        return;
+      }
+      if (resTarea.status === 403) {
+        router.replace("/403");
+        return;
+      }
       if (!resTarea.ok) {
-        throw new Error("Error al crear tarea");
+        const err = await resTarea.json().catch(() => ({}));
+        throw new Error(err?.error || "Error al crear tarea");
       }
 
       const tareaCreada = await resTarea.json();
 
-      // Paso 2: Crear la relación servicio_tarea
+      // 2) Crear relación servicio_tarea
       const payload = {
         obraId: Number(obraId),
         servicioId: Number(valores.servicioId),
         tareaId: tareaCreada.id,
-        fechaInicio: valores.fechaInicio,
-        fechaFin: valores.fechaFin,
+        fechaInicio: valores.fechaInicio || null,
+        fechaFin: valores.fechaFin || null,
       };
-
-      console.log("Payload a enviar:", payload);
 
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/servicios_tarea`,
         {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-          credentials: "include",
         }
       );
 
+      if (res.status === 401) {
+        if (typeof window !== "undefined") window.location.href = "/login";
+        return;
+      }
+      if (res.status === 403) {
+        router.replace("/403");
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         alert("Servicio añadido a la obra");
         router.push(`/obras/${obraId}`);
       } else {
-        alert("Error al crear relación servicio-tarea");
+        alert(
+          "Error al crear relación servicio-tarea: " +
+            (data?.error || "Desconocido")
+        );
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("❌ Error en handleSubmit:", err);
-      alert("Error al crear servicio y tarea");
+      alert(err?.message || "Error al crear servicio y tarea");
+    } finally {
+      setEnviando(false);
     }
   };
 
   return (
-    <FormularioTabla
-      titulo="Añadir Servicio"
-      campos={campos}
-      valores={valores}
-      onChange={handleChange}
-      onSubmit={handleSubmit}
-    />
+    <RequirePermiso modulo="servicios" accion="crear">
+      <FormularioTabla
+        titulo="Añadir Servicio"
+        campos={campos}
+        valores={valores}
+        onChange={handleChange}
+        onSubmit={enviando ? undefined : handleSubmit}
+        botonTexto={enviando ? "Creando..." : "Crear"}
+      />
+    </RequirePermiso>
   );
 }

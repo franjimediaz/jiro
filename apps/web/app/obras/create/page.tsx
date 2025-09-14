@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import FormularioTabla from "../../components/FormularioTabla";
+import { RequirePermiso } from "../../lib/permisos";
 
 const campos = [
   { nombre: "nombre", etiqueta: "Nombre de la obra" },
@@ -44,34 +45,51 @@ export default function NuevaObra() {
   };
 
   const handleSubmit = async () => {
-    console.log("Datos a enviar:", valores); // 👈 AÑADE ESTE LOG
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(valores),
+      });
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(valores),
-      credentials: "include",
-    });
+      // Manejo explícito de 401/403
+      if (res.status === 401) {
+        // no autenticado
+        router.replace("/login");
+        return;
+      }
+      if (res.status === 403) {
+        // autenticado pero sin permiso
+        router.replace("/403");
+        return;
+      }
 
-    const data = await res.json();
-    console.log("Respuesta del backend:", data); // 👈 AÑADE ESTE LOG
+      const data = await res.json().catch(() => ({}) as any);
 
-    if (res.ok) {
-      alert("Obra creada correctamente");
-      router.push("/obras");
-    } else {
-      alert(`Error al crear la obra: ${data?.detalle}`);
+      if (res.ok) {
+        alert("Obra creada correctamente");
+        router.push("/obras");
+      } else {
+        alert(
+          `Error al crear la obra: ${data?.detalle || data?.error || "Error desconocido"}`
+        );
+      }
+    } catch (err: any) {
+      alert(err?.message || "Error desconocido al crear la obra");
     }
   };
 
   return (
-    <FormularioTabla
-      titulo="Crear Nueva Obra"
-      campos={campos}
-      valores={valores}
-      onChange={handleChange}
-      onSubmit={handleSubmit}
-      botonTexto="Crear"
-    />
+    <RequirePermiso modulo="obras" accion="crear">
+      <FormularioTabla
+        titulo="Crear Nueva Obra"
+        campos={campos}
+        valores={valores}
+        onChange={handleChange}
+        onSubmit={handleSubmit}
+        botonTexto="Crear"
+      />
+    </RequirePermiso>
   );
 }

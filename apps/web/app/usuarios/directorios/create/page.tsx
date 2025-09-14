@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import FormularioTabla from "../../../components/FormularioTabla";
+import { RequirePermiso } from "../../../lib/permisos";
 
 const secciones = [
   {
@@ -11,7 +12,12 @@ const secciones = [
     expandible: true,
     expandidaPorDefecto: true,
     campos: [
-      { nombre: "id", etiqueta: "ID", readonly: true, tipo: "readonly" },
+      {
+        nombre: "id",
+        etiqueta: "ID",
+        readonly: true,
+        tipo: "readonly",
+      },
       {
         nombre: "tipo",
         etiqueta: "Tipo",
@@ -20,7 +26,7 @@ const secciones = [
         campoLabel: "nombre",
         campoValue: "id",
       },
-      { nombre: "estado", etiqueta: "Estado" },
+      { nombre: "estado", etiqueta: "Activo", tipo: "checkbox" },
       { nombre: "nombre", etiqueta: "Nombre" },
       { nombre: "apellidos", etiqueta: "Apellidos" },
       { nombre: "displayName", etiqueta: "Display Name" },
@@ -64,15 +70,6 @@ const secciones = [
         campoLabel: "nombre",
         campoValue: "id",
       },
-      {
-        nombre: "subordinados",
-        etiqueta: "Subordinados",
-        tipo: "selectorTabla",
-        tabla: "directorios",
-        campoLabel: "nombre",
-        campoValue: "id",
-      },
-
       { nombre: "rol", etiqueta: "Rol" },
       { nombre: "jornada", etiqueta: "Jornada" },
       { nombre: "turno", etiqueta: "Turno" },
@@ -151,13 +148,13 @@ const secciones = [
   },
 ];
 
-export default function NuevaDirectorio() {
+export default function NuevoDirectorio() {
   const router = useRouter();
 
-  const [valores, setValores] = useState({
+  const [valores, setValores] = useState<any>({
     id: "",
     tipo: "",
-    estado: "",
+    estado: true,
     nombre: "",
     apellidos: "",
     displayName: "",
@@ -169,24 +166,21 @@ export default function NuevaDirectorio() {
     fotoUrl: "",
     puesto: "",
     departamentoId: "",
-    departamento: "",
     supervisorId: "",
-    supervisor: "",
-    subordinados: "",
+    subordinados: [],
     rol: "",
     jornada: "",
     turno: "",
     empresaExternaId: "",
-    empresaExterna: "",
     usuarioId: "",
     calendarEmail: "",
     costeHora: "",
     tarifaFacturacionHora: "",
-    moneda: "",
+    moneda: "EUR",
     capacidadSemanalHoras: "",
-    tienePRL: "",
+    tienePRL: false,
     prlVencimiento: "",
-    rcVigente: "",
+    rcVigente: false,
     rcVencimiento: "",
     ubicacionCiudad: "",
     ubicacionProvincia: "",
@@ -194,37 +188,112 @@ export default function NuevaDirectorio() {
     fechaAlta: "",
     fechaBaja: "",
     observaciones: "",
-    tags: "",
+    tags: [],
   });
 
   const handleChange = (nombre: string, valor: any) => {
-    setValores((prev) => ({ ...prev, [nombre]: valor }));
+    setValores((prev: any) => ({ ...prev, [nombre]: valor }));
   };
 
   const handleSubmit = async () => {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/Directorios`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(valores),
-    });
+    const usuarioIdParsed =
+      valores.usuarioId === "" || valores.usuarioId == null
+        ? null
+        : Number(valores.usuarioId);
 
-    if (res.ok) {
-      alert("Directorio creada correctamente");
-      router.push("/Directorios");
-    } else {
-      alert("Error al crear la Directorio");
+    if (usuarioIdParsed !== null && Number.isNaN(usuarioIdParsed)) {
+      alert("El campo 'Usuario' es inválido.");
+      return;
+    }
+
+    // Validación rápida de obligatorios
+    if (
+      !valores.nombre?.trim() ||
+      !valores.apellidos?.trim() ||
+      !valores.email?.trim()
+    ) {
+      alert("Faltan campos obligatorios: Nombre, Apellidos y Email");
+      return;
+    }
+    // Validación básica de email
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valores.email)) {
+      alert("Email no válido");
+      return;
+    }
+    if (
+      valores.calendarEmail &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valores.calendarEmail)
+    ) {
+      alert("Calendar Email no válido");
+      return;
+    }
+
+    const payload = {
+      ...valores,
+      // Scalars
+      estado: Boolean(valores.estado),
+      tienePRL: Boolean(valores.tienePRL),
+      rcVigente: Boolean(valores.rcVigente),
+
+      // Ints
+      capacidadSemanalHoras: valores.capacidadSemanalHoras
+        ? Number(valores.capacidadSemanalHoras)
+        : null,
+
+      // Decimals → string (mejor para Prisma Decimal)
+      costeHora:
+        valores.costeHora !== "" && valores.costeHora != null
+          ? String(valores.costeHora)
+          : null,
+      tarifaFacturacionHora:
+        valores.tarifaFacturacionHora !== "" &&
+        valores.tarifaFacturacionHora != null
+          ? String(valores.tarifaFacturacionHora)
+          : null,
+
+      // FK Int
+      usuarioId: usuarioIdParsed,
+
+      // Arrays
+      tags: Array.isArray(valores.tags) ? valores.tags : [],
+    };
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/directorios`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (res.ok) {
+        alert("Directorio creado correctamente");
+        router.push("/usuarios/directorios");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(
+          "Error al crear el directorio" + (err?.error ? `: ${err.error}` : "")
+        );
+      }
+    } catch (e) {
+      console.error("Error al crear directorio:", e);
+      alert("Error inesperado al crear el directorio");
     }
   };
 
   return (
-    <FormularioTabla
-      titulo="Crear Directorio"
-      secciones={secciones}
-      valores={valores}
-      onChange={handleChange}
-      onSubmit={handleSubmit}
-      botonTexto="Crear"
-    />
+    <RequirePermiso modulo="directorios" accion="crear" fallback={null}>
+      <FormularioTabla
+        titulo="Crear Directorio"
+        secciones={secciones}
+        valores={valores}
+        onChange={handleChange}
+        onSubmit={handleSubmit}
+        botonTexto="Crear"
+      />
+    </RequirePermiso>
   );
 }

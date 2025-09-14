@@ -52,13 +52,14 @@ model Usuario {
   rolId        Int?   
   rol          Rol?      @relation(fields: [rolId], references: [id], onDelete: SetNull)    
   activo   Boolean @default(true)
+  directorio   Directorios?
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt      @map("updated_at")
 }
 
 
 model Directorios {
-  id                      String         @id @default(cuid())
+  id                      Int         @id @default(autoincrement())
   tipo                    String?
   estado                  Boolean?
 
@@ -75,18 +76,23 @@ model Directorios {
   puesto                  String?
   departamentoId          String?
   departamento            Departamento?  @relation(fields: [departamentoId], references: [id])
-  supervisorId            String?
-  supervisor              Directorios? @relation("SupervisorSubordinado", fields: [supervisorId], references: [id])
-  subordinados            Directorios[] @relation("SupervisorSubordinado")
 
-  rol                     String?           
-  jornada                 String?        // "completa" | "parcial" | "por_horas"
-  turno                   String?        // "mañana" | "tarde" | "noche"
+  /// 🧭 Self-relation: un directorio puede tener un supervisor y muchos subordinados
+  supervisorId            Int?
+  supervisor              Directorios?   @relation("SupervisorSubordinado", fields: [supervisorId], references: [id])
+  subordinados            Directorios[]  @relation("SupervisorSubordinado")
+
+  rol                     String?
+  jornada                 String?
+  turno                   String?
 
   empresaExternaId        String?
   empresaExterna          EmpresaExterna? @relation(fields: [empresaExternaId], references: [id])
 
-  usuarioId               String?        // FK a tu tabla de usuarios si procede
+  /// 🔗 Relación 1:1 con Usuario (Usuario.id es Int → este campo también Int)
+  usuarioId               Int?           @unique
+  usuario                 Usuario?       @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
   calendarEmail           String?
 
   costeHora               Decimal?       @db.Decimal(12,2)
@@ -107,7 +113,6 @@ model Directorios {
   fechaBaja               DateTime?
   observaciones           String?
   tags                    String[]       @db.Text
-
 
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt

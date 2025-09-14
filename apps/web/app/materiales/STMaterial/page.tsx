@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FormularioTabla from "../../components/FormularioTabla";
+import { RequirePermiso } from "../../lib/permisos";
 
 const campos = [
   {
@@ -36,6 +37,8 @@ export default function Nuevamaterial() {
     total: "",
     facturable: false,
   });
+
+  // Recalcular total al cambiar cantidad o precio unidad
   useEffect(() => {
     const cantidad = parseFloat(valores.cantidad) || 0;
     const precioUnidad = parseFloat(valores.preciounidad) || 0;
@@ -51,9 +54,9 @@ export default function Nuevamaterial() {
     const payload = {
       ServicioTareaId: Number(valores.ServicioTareaId),
       materialesId: Number(valores.materialesId),
-      cantidad: parseFloat(valores.cantidad),
-      preciounidad: parseFloat(valores.preciounidad),
-      total: parseFloat(valores.total),
+      cantidad: parseFloat(valores.cantidad) || 0,
+      preciounidad: parseFloat(valores.preciounidad) || 0,
+      total: parseFloat(valores.total) || 0,
       facturable: Boolean(valores.facturable),
     };
 
@@ -63,19 +66,31 @@ export default function Nuevamaterial() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
           credentials: "include",
+          body: JSON.stringify(payload),
         }
       );
 
-      const data = await res.json(); // ✅ leer contenido
+      if (res.status === 401) {
+        if (typeof window !== "undefined") window.location.href = "/login";
+        return;
+      }
+      if (res.status === 403) {
+        router.replace("/403");
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
         alert("Material asignado correctamente");
         router.back();
       } else {
+        const msg =
+          (data && (data.error || data.message || data.detalle)) ||
+          "Error desconocido";
         console.error("❌ Backend respondió error:", data);
-        alert("❌ Error al asignar material: " + data.error);
+        alert("❌ Error al asignar material: " + msg);
       }
     } catch (error) {
       console.error("❌ Error inesperado:", error);
@@ -84,13 +99,15 @@ export default function Nuevamaterial() {
   };
 
   return (
-    <FormularioTabla
-      titulo="Crear Nuevo material"
-      campos={campos}
-      valores={valores}
-      onChange={handleChange}
-      onSubmit={handleSubmit}
-      botonTexto="Crear"
-    />
+    <RequirePermiso modulo="materiales" accion="crear">
+      <FormularioTabla
+        titulo="Crear Nuevo material"
+        campos={campos}
+        valores={valores}
+        onChange={handleChange}
+        onSubmit={handleSubmit}
+        botonTexto="Crear"
+      />
+    </RequirePermiso>
   );
 }

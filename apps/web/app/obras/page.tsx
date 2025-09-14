@@ -18,9 +18,22 @@ type Obra = {
 export default function ObrasPage() {
   const [obras, setObras] = useState<Obra[]>([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter(); // ← Aquí
+  const router = useRouter();
 
+  // ⬇️ Cargamos permisos desde el provider
+  const { loading: permisosLoading, can } = usePermisos();
+
+  // ⬇️ Traer datos SOLO si tiene permiso de 'ver'
   useEffect(() => {
+    if (permisosLoading) return; // espera a que carguen permisos
+
+    if (!can("obras", "ver")) {
+      // si no puede ver, no pidas nada y marca como cargado
+      setObras([]);
+      setLoading(false);
+      return;
+    }
+
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras`, {
       credentials: "include",
     })
@@ -33,9 +46,14 @@ export default function ObrasPage() {
         console.error("Error al obtener obras:", err);
         setLoading(false);
       });
-  }, []);
+  }, [permisosLoading, can]);
 
   const handleEliminar = (obra: any) => {
+    if (!can("obras", "eliminar")) {
+      alert("Sin permiso para eliminar");
+      return;
+    }
+
     if (confirm(`¿Eliminar obra "${obra.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras/${obra.id}`, {
         method: "DELETE",
@@ -63,6 +81,7 @@ export default function ObrasPage() {
       render: (valor: string) => new Date(valor).toLocaleDateString(),
     },
   ];
+
   const exportC = [
     { clave: "id", encabezado: "ID" },
     { clave: "nombre", encabezado: "Nombre" },
@@ -79,46 +98,61 @@ export default function ObrasPage() {
     },
   ];
 
-  return (
-    <main>
-      <div className={styles.obrasContainer}>
-        <div className={styles.header}>
-          <h1>Listado de Obras</h1>
-          <button
-            className={styles.botonCrear}
-            onClick={() => router.push("/obras/create")}
-          >
-            + Crear Obra
-          </button>
-        </div>
+  // ⬇️ Si no hay permiso de exportar, pasamos un array vacío para no mostrar export (si tu tabla lo soporta así)
+  const exportColumns = can("obras", "exportar") ? exportC : [];
 
-        {loading ? (
-          <p>Cargando obras...</p>
-        ) : (
-          <TablaListado
-            titulo=""
-            columnas={columnas}
-            datos={obras}
-            onVer={(obras) => router.push(`/obras/${obras.id}`)}
-            onEditar={(obras) => router.push(`/obras/${obras.id}?edit=true`)}
-            onEliminar={handleEliminar}
-            registrosPorPagina={10}
-            exportC={exportC}
-            mostrarImportar={true}
-            importUrl={`${process.env.NEXT_PUBLIC_API_URL}/obras`}
-            onImport={async () => {
-              const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/obras`,
-                {
-                  credentials: "include",
-                }
-              );
-              const nuevosDatos = await res.json();
-              setObras(nuevosDatos);
-            }}
-          />
-        )}
-      </div>
-    </main>
+  return (
+    <RequirePermiso modulo="obras" accion="ver">
+      <main>
+        <div className={styles.obrasContainer}>
+          <div className={styles.header}>
+            <h1>Listado de Obras</h1>
+
+            {/* Mostrar el botón crear solo si tiene permiso */}
+            {can("obras", "crear") && (
+              <button
+                className={styles.botonCrear}
+                onClick={() => router.push("/obras/create")}
+              >
+                + Crear Obra
+              </button>
+            )}
+          </div>
+
+          {loading ? (
+            <p>Cargando obras...</p>
+          ) : (
+            <TablaListado
+              titulo=""
+              columnas={columnas}
+              datos={obras}
+              onVer={(obra) =>
+                can("obras", "ver") && router.push(`/obras/${obra.id}`)
+              }
+              onEditar={(obra) =>
+                can("obras", "editar") &&
+                router.push(`/obras/${obra.id}?edit=true`)
+              }
+              onEliminar={handleEliminar}
+              registrosPorPagina={10}
+              exportC={exportColumns}
+              mostrarImportar={can("obras", "importar")}
+              importUrl={`${process.env.NEXT_PUBLIC_API_URL}/obras`}
+              onImport={async () => {
+                if (!can("obras", "importar")) return;
+                const res = await fetch(
+                  `${process.env.NEXT_PUBLIC_API_URL}/obras`,
+                  {
+                    credentials: "include",
+                  }
+                );
+                const nuevosDatos = await res.json();
+                setObras(nuevosDatos);
+              }}
+            />
+          )}
+        </div>
+      </main>
+    </RequirePermiso>
   );
 }

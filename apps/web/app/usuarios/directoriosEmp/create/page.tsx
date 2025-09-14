@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import FormularioTabla from "../../../components/FormularioTabla";
+import { RequirePermiso } from "../../../lib/permisos";
 
+// Estructura del formulario por secciones
 const secciones = [
   {
     titulo: "Identificación",
@@ -20,7 +22,7 @@ const secciones = [
         campoLabel: "nombre",
         campoValue: "id",
       },
-      { nombre: "estado", etiqueta: "Estado" },
+      { nombre: "estado", etiqueta: "Activo", tipo: "checkbox" }, // Boolean en tu modelo
       { nombre: "nombre", etiqueta: "Nombre" },
       { nombre: "apellidos", etiqueta: "Apellidos" },
       { nombre: "displayName", etiqueta: "Display Name" },
@@ -71,8 +73,8 @@ const secciones = [
         tabla: "directorios",
         campoLabel: "nombre",
         campoValue: "id",
+        multiple: true,
       },
-
       { nombre: "rol", etiqueta: "Rol" },
       { nombre: "jornada", etiqueta: "Jornada" },
       { nombre: "turno", etiqueta: "Turno" },
@@ -154,10 +156,10 @@ const secciones = [
 export default function NuevaDirectorio() {
   const router = useRouter();
 
-  const [valores, setValores] = useState({
+  const [valores, setValores] = useState<any>({
     id: "",
     tipo: "",
-    estado: "",
+    estado: true, // por defecto activo
     nombre: "",
     apellidos: "",
     displayName: "",
@@ -172,7 +174,7 @@ export default function NuevaDirectorio() {
     departamento: "",
     supervisorId: "",
     supervisor: "",
-    subordinados: "",
+    subordinados: [],
     rol: "",
     jornada: "",
     turno: "",
@@ -182,11 +184,11 @@ export default function NuevaDirectorio() {
     calendarEmail: "",
     costeHora: "",
     tarifaFacturacionHora: "",
-    moneda: "",
+    moneda: "EUR",
     capacidadSemanalHoras: "",
-    tienePRL: "",
+    tienePRL: false,
     prlVencimiento: "",
-    rcVigente: "",
+    rcVigente: false,
     rcVencimiento: "",
     ubicacionCiudad: "",
     ubicacionProvincia: "",
@@ -194,37 +196,80 @@ export default function NuevaDirectorio() {
     fechaAlta: "",
     fechaBaja: "",
     observaciones: "",
-    tags: "",
+    tags: [], // el tipo "tags" suele devolver array
   });
 
   const handleChange = (nombre: string, valor: any) => {
-    setValores((prev) => ({ ...prev, [nombre]: valor }));
+    setValores((prev: any) => ({ ...prev, [nombre]: valor }));
   };
 
   const handleSubmit = async () => {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/Directorios`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(valores),
-    });
+    // Pequeño saneo de tipos antes de enviar
+    const payload = {
+      ...valores,
+      estado: Boolean(valores.estado),
+      tienePRL: Boolean(valores.tienePRL),
+      rcVigente: Boolean(valores.rcVigente),
+      capacidadSemanalHoras: valores.capacidadSemanalHoras
+        ? Number(valores.capacidadSemanalHoras)
+        : null,
+      costeHora: valores.costeHora ? Number(valores.costeHora) : null,
+      tarifaFacturacionHora: valores.tarifaFacturacionHora
+        ? Number(valores.tarifaFacturacionHora)
+        : null,
+      tags: Array.isArray(valores.tags)
+        ? valores.tags
+        : typeof valores.tags === "string" && valores.tags.trim()
+          ? valores.tags.split(",").map((t: string) => t.trim())
+          : [],
+    };
 
-    if (res.ok) {
-      alert("Directorio creada correctamente");
-      router.push("/Directorios");
-    } else {
-      alert("Error al crear la Directorio");
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/directorios`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (res.status === 401) {
+        if (typeof window !== "undefined") window.location.href = "/login";
+        return;
+      }
+      if (res.status === 403) {
+        router.replace("/403");
+        return;
+      }
+
+      if (res.ok) {
+        alert("Directorio creado correctamente");
+        router.push("/usuarios/directorios");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(
+          "Error al crear el directorio: " +
+            (data?.error || data?.message || "desconocido")
+        );
+      }
+    } catch (err) {
+      console.error("Error al crear Directorio:", err);
+      alert("No se pudo crear el directorio. Revisa la consola.");
     }
   };
 
   return (
-    <FormularioTabla
-      titulo="Crear Directorio"
-      secciones={secciones}
-      valores={valores}
-      onChange={handleChange}
-      onSubmit={handleSubmit}
-      botonTexto="Crear"
-    />
+    <RequirePermiso modulo="directorios" accion="crear" fallback={null}>
+      <FormularioTabla
+        titulo="Crear Directorio"
+        secciones={secciones}
+        valores={valores}
+        onChange={handleChange}
+        onSubmit={handleSubmit}
+        botonTexto="Crear"
+      />
+    </RequirePermiso>
   );
 }

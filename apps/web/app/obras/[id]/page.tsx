@@ -7,13 +7,16 @@ import TreeViewServiciosTareas from "../../components/TreeViewServiciosTareas/Tr
 import CrearPresupuestoBtn from "../../components/CrearPresupuestoBtn";
 import type { Columna } from "../../components/TablaListado";
 import TablaListado from "../../components/TablaListado";
+import { RequirePermiso, usePermisos } from "../../lib/permisos";
 
 type Presupuesto = {
   id: number;
   descripcion: string;
   importe: number;
-  estado: string;
-  fecha: string;
+  estado?: string;
+  createdAt?: string;
+  nombre?: string;
+  aceptado?: boolean;
 };
 
 const campos = [
@@ -46,18 +49,18 @@ const columnas: Columna[] = [
     clave: "importe",
     encabezado: "Importe",
     tipo: "texto",
-    render: (valor: number) => `${valor?.toFixed(2) || "0.00"} €`,
+    render: (valor: number) => `${Number(valor ?? 0).toFixed(2)} €`,
   },
   { clave: "aceptado", encabezado: "Aceptado", tipo: "checkbox" },
 ];
 
 export default function VerEditarObra() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const modoEdicion = searchParams.get("edit") === "true";
-  const [valores, setValores] = useState({
+  const modoEdicionQuery = searchParams.get("edit") === "true";
+  const [valores, setValores] = useState<any>({
     nombre: "",
     direccion: "",
     fechaInicio: "",
@@ -65,47 +68,72 @@ export default function VerEditarObra() {
     email: "",
     telefono: "",
     clienteId: "",
+    estadoId: "",
   });
   const [cargando, setCargando] = useState(true);
-
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
 
+  // permisos
+  const { loading: permisosLoading, can } = usePermisos();
+  const puedeVerObras = can("obras", "ver");
+  const puedeEditarObras = can("obras", "editar");
+  const puedeVerPresupuestos = can("presupuestos", "ver");
+  const puedeCrearPresupuestos = can("presupuestos", "crear");
+  const puedeEditarPresupuestos = can("presupuestos", "editar");
+  const puedeEliminarPresupuestos = can("presupuestos", "eliminar");
+  const puedeVerTareas = can("tareas", "ver") || can("servicios", "ver");
+
+  // Si viene con ?edit=true pero no tiene permiso, redirige a /403
   useEffect(() => {
-    if (!id) return;
+    if (permisosLoading) return;
+    if (modoEdicionQuery && !puedeEditarObras) {
+      router.replace("/403");
+    }
+  }, [permisosLoading, modoEdicionQuery, puedeEditarObras, router]);
+
+  // Cargar presupuestos de la obra (solo si puede ver presupuestos)
+  useEffect(() => {
+    if (!id || permisosLoading || !puedeVerPresupuestos) return;
 
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/presupuestos/por-obra/${id}`, {
       credentials: "include",
     })
       .then((res) => res.json())
       .then((data) => {
-        console.log("✅ Datos presupuestos:", data);
         if (Array.isArray(data)) {
           setPresupuestos(data);
         } else {
-          console.error("❌ La respuesta no es un array:", data);
-          setPresupuestos([]); // prevenir errores en la tabla
+          console.error(
+            "❌ La respuesta de presupuestos no es un array:",
+            data
+          );
+          setPresupuestos([]);
         }
       })
       .catch((err) => {
         console.error("❌ Error al obtener presupuestos:", err);
         setPresupuestos([]);
       });
-  }, [id]);
+  }, [id, permisosLoading, puedeVerPresupuestos]);
 
+  // Cargar datos de la obra
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/Obras/${id}`, {
+    if (!id || permisosLoading || !puedeVerObras) return;
+
+    // ⚠️ IMPORTANTE: endpoint correcto en minúsculas
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras/${id}`, {
       credentials: "include",
     })
       .then((res) => res.json())
       .then((data) => {
-        setValores(data);
-        setCargando(false);
+        // Ajuste de fechas al formato yyyy-mm-dd para inputs tipo date
         const obraFormateada = {
           ...data,
-          fechaInicio: data.fechaInicio?.split("T")[0],
-          fechaFin: data.fechaFin?.split("T")[0],
+          fechaInicio: data?.fechaInicio
+            ? String(data.fechaInicio).split("T")[0]
+            : "",
+          fechaFin: data?.fechaFin ? String(data.fechaFin).split("T")[0] : "",
         };
-
         setValores(obraFormateada);
         setCargando(false);
       })
@@ -113,13 +141,17 @@ export default function VerEditarObra() {
         console.error("Error al obtener Obra:", err);
         setCargando(false);
       });
-  }, [id]);
+  }, [id, permisosLoading, puedeVerObras]);
 
   const handleChange = (nombre: string, valor: any) => {
-    setValores((prev) => ({ ...prev, [nombre]: valor }));
+    setValores((prev: any) => ({ ...prev, [nombre]: valor }));
   };
 
   const handleSubmit = async () => {
+    if (!puedeEditarObras) {
+      alert("No tienes permiso para editar esta obra.");
+      return;
+    }
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras/${id}`, {
       method: "PUT",
       credentials: "include",
@@ -128,27 +160,34 @@ export default function VerEditarObra() {
     });
 
     if (res.ok) {
-      alert("Obra actualizado");
+      alert("Obra actualizada");
       router.push("/obras");
     } else {
-      alert("Error al actualizar");
+      const e = await res.json().catch(() => ({}));
+      alert(e?.error || "Error al actualizar");
     }
   };
 
-  const handleEliminar = async (id: number) => {
+  const handleEliminarPresupuesto = async (presupuestoId: number) => {
+    if (!puedeEliminarPresupuestos) {
+      alert("No tienes permiso para eliminar presupuestos.");
+      return;
+    }
     if (!confirm("¿Estás seguro de eliminar este presupuesto?")) return;
+
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${presupuestoId}`,
         {
           method: "DELETE",
           credentials: "include",
         }
       );
       if (res.ok) {
-        setPresupuestos((prev) => prev.filter((p) => p.id !== id));
+        setPresupuestos((prev) => prev.filter((p) => p.id !== presupuestoId));
       } else {
-        alert("Error al eliminar presupuesto");
+        const e = await res.json().catch(() => ({}));
+        alert(e?.error || "Error al eliminar presupuesto");
       }
     } catch (err) {
       console.error(err);
@@ -156,48 +195,63 @@ export default function VerEditarObra() {
     }
   };
 
-  if (cargando) return <p>Cargando Obra...</p>;
+  if (cargando || permisosLoading) return <p>Cargando Obra...</p>;
+
+  const modoEdicionHabilitado = modoEdicionQuery && puedeEditarObras;
 
   return (
-    <div className="contenedor-formulario">
-      <FormularioTabla
-        titulo={modoEdicion ? "Editar Obra" : "Detalle del Obra"}
-        campos={campos}
-        valores={valores}
-        onChange={modoEdicion ? handleChange : undefined}
-        onSubmit={modoEdicion ? handleSubmit : undefined}
-        botonTexto="Guardar cambios"
-        soloLectura={!modoEdicion}
-      />
-      {!cargando && valores.clienteId && (
-        <div className="alineado-boton">
-          <CrearPresupuestoBtn
-            clienteId={Number(valores.clienteId)}
-            obraId={Number(id)}
-            nombre={`Presupuesto para ${valores.nombre}`}
-            descripcion={`Presupuesto generado desde la obra "${valores.nombre}"`}
-            onSuccess={(presupuesto) => {
-              console.log("Presupuesto creado:", presupuesto);
-              router.push(`/obras/presupuestos/${presupuesto.id}?edit=true`);
-            }}
+    <RequirePermiso modulo="obras" accion="ver">
+      <div className="contenedor-formulario">
+        <FormularioTabla
+          titulo={modoEdicionHabilitado ? "Editar Obra" : "Detalle de la Obra"}
+          campos={campos}
+          valores={valores}
+          onChange={modoEdicionHabilitado ? handleChange : undefined}
+          onSubmit={modoEdicionHabilitado ? handleSubmit : undefined}
+          botonTexto="Guardar cambios"
+          soloLectura={!modoEdicionHabilitado}
+        />
+
+        {/* Crear presupuesto solo si hay cliente y permiso de crear */}
+        {!cargando && valores.clienteId && puedeCrearPresupuestos && (
+          <div className="alineado-boton">
+            <CrearPresupuestoBtn
+              clienteId={Number(valores.clienteId)}
+              obraId={Number(id)}
+              nombre={`Presupuesto para ${valores.nombre}`}
+              descripcion={`Presupuesto generado desde la obra "${valores.nombre}"`}
+              onSuccess={(presupuesto) => {
+                router.push(`/obras/presupuestos/${presupuesto.id}?edit=true`);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Tabla de presupuestos solo si puede verlos */}
+        {puedeVerPresupuestos && (
+          <TablaListado
+            titulo="Presupuestos vinculados"
+            columnas={columnas}
+            datos={presupuestos}
+            onVer={(presupuesto) =>
+              puedeVerPresupuestos &&
+              router.push(`/obras/presupuestos/${presupuesto.id}`)
+            }
+            onEditar={(presupuesto) =>
+              puedeEditarPresupuestos &&
+              router.push(`/obras/presupuestos/${presupuesto.id}?edit=true`)
+            }
+            onEliminar={(p) => handleEliminarPresupuesto(p.id)}
+            mostrarImportar={false}
+            registrosPorPagina={10}
           />
-        </div>
-      )}
-      <TablaListado
-        titulo="Presupuestos vinculados"
-        columnas={columnas}
-        datos={presupuestos}
-        onVer={(presupuesto) =>
-          router.push(`/obras/presupuestos/${presupuesto.id}`)
-        }
-        onEditar={(presupuesto) =>
-          router.push(`/obras/presupuestos/${presupuesto.id}?edit=true`)
-        }
-        onEliminar={(presupuestos) => handleEliminar(presupuestos.id)}
-        mostrarImportar={false}
-        registrosPorPagina={1}
-      />
-      {!cargando && id && <TreeViewServiciosTareas obraId={Number(id)} />}
-    </div>
+        )}
+
+        {/* Árbol servicios/tareas solo si tiene permiso de ver tareas/servicios */}
+        {!cargando && id && puedeVerTareas && (
+          <TreeViewServiciosTareas obraId={Number(id)} />
+        )}
+      </div>
+    </RequirePermiso>
   );
 }

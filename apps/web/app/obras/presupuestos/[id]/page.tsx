@@ -1,39 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import DatosEmpresaCliente from "../../../components/DatosEmpresaCliente";
 import FormularioTabla from "../../../components/FormularioTabla";
 import ArbolPresupuesto from "../../../components/ArbolPresupuesto";
 import TablaListado from "../../../components/TablaListado";
 import type { Columna } from "../../../components/TablaListado";
+import { RequirePermiso, usePermisos } from "../../../lib/permisos";
 
 type Presupuesto = {
   id: number;
-  descripcion: string;
+  nombre: string;
+  descripcion: string; // <- sin tilde
   importe: number;
-  estado: string;
-  fecha: string;
+  aceptado: boolean;
+  condiciones?: string | null;
+  clienteId: number;
+  createdAt: string;
 };
+
 type Factura = {
   id: number;
-  numero?: string;
-  descripcion: string;
-  importe: number;
-  estado: "pendiente" | "pagada" | "cancelada";
-  presupuestoId: number;
+  numero?: string | null;
+  descripcion?: string | null;
+  referencia?: string | null;
+  cantidad?: number | null; // tu backend usa "cantidad" como importe facturado
+  estado?: string | null; // "pendiente" | "pagado" | "cancelado" (según backend)
   createdAt: string;
-  updatedAt?: string;
-  presupuesto?: {
-    descripcion: string;
-    nombre?: string;
-    importe: number;
-  };
 };
 
 const campos = [
   { nombre: "nombre", etiqueta: "Nombre" },
-  { nombre: "descripción", etiqueta: "Descripción del presupuesto" },
+  { nombre: "descripcion", etiqueta: "Descripción del presupuesto" }, // <- sin tilde
   { nombre: "importe", etiqueta: "Importe (€)" },
   { nombre: "aceptado", etiqueta: "¿Aceptado?", tipo: "checkbox" },
   { nombre: "condiciones", etiqueta: "Condiciones", tipo: "richtext" },
@@ -43,225 +42,309 @@ export default function DetallePresupuesto() {
   const { id } = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
-  const [facturas, setFacturas] = useState<Factura[]>([]);
+
+  const { can } = usePermisos();
+  const puedeEditarPres = can("presupuestos", "editar");
+  const puedeVerFacturas = can("facturas", "ver");
+  const puedeEditarFacturas = can("facturas", "editar");
+  const puedeEliminarFacturas = can("facturas", "eliminar");
 
   const modoEdicion = searchParams.get("edit") === "true";
 
-  const [presupuesto, setPresupuesto] = useState<any>(null);
+  const [presupuesto, setPresupuesto] = useState<Presupuesto | null>(null);
+  const [facturas, setFacturas] = useState<Factura[]>([]);
   const [cargando, setCargando] = useState(true);
+
   const [valores, setValores] = useState<any>({
-    descripción: "",
+    nombre: "",
+    descripcion: "",
     importe: "",
     aceptado: false,
     condiciones: "",
   });
 
-  const columnas: Columna[] = [
-    { clave: "referencia", encabezado: "Referencia", tipo: "texto" },
-    { clave: "descripcion", encabezado: "Descripción", tipo: "texto" },
-    {
-      clave: "createdAt",
-      encabezado: "Fecha",
-      tipo: "texto",
-      render: (valor: string) => new Date(valor).toLocaleDateString("es-ES"),
-    },
-    {
-      clave: "cantidad",
-      encabezado: "Importe",
-      tipo: "texto",
-      render: (valor: number) => `${valor?.toFixed(2) || "0.00"} €`,
-    },
-    {
-      clave: "estado",
-      encabezado: "Estado",
-      tipo: "texto",
-      render: (valor: string) => (
-        <span
-          style={{
-            padding: "0.25rem 0.5rem",
-            borderRadius: "4px",
-            fontSize: "0.8rem",
-            fontWeight: "bold",
-            backgroundColor: valor === "pagada" ? "#d1fae5" : "#fef3c7",
-            color: valor === "pagada" ? "#065f46" : "#92400e",
-          }}
-        >
-          {valor || "pendiente"}
-        </span>
-      ),
-    },
-  ];
+  // ---------------------------
+  // Cargar presupuesto por id
+  // ---------------------------
   useEffect(() => {
     if (!id) return;
 
-    console.log("🧾 Buscando facturas para presupuesto ID:", id);
+    const cargar = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${id}`,
+          {
+            credentials: "include",
+          }
+        );
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/facturas/por-presupuesto/${id}`, {
-      credentials: "include",
-    })
-      .then((res) => {
-        console.log("📡 Response facturas:", res.status);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data: Factura[]) => {
-        // ✅ Tipado como array de Facturas
-        console.log("✅ Facturas recibidas:", data);
-        console.log("🔢 Cantidad de facturas:", data.length);
-
-        // ✅ Validar que sea un array
-        if (Array.isArray(data)) {
-          setFacturas(data);
-        } else {
-          console.error("❌ La respuesta no es un array:", data);
-          setFacturas([]);
+        if (res.status === 401) {
+          if (typeof window !== "undefined") window.location.href = "/login";
+          return;
         }
-      })
-      .catch((err) => {
-        console.error("❌ Error al obtener facturas:", err);
-        setFacturas([]);
-      });
-  }, [id]);
+        if (res.status === 403) {
+          router.replace("/403");
+          return;
+        }
 
-  useEffect(() => {
-    if (!id) return;
-
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${id}  `, {
-      credentials: "include",
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("📦 Presupuesto recibido:", data);
-        setPresupuesto(data);
-        setValores({
+        const data = await res.json();
+        // Normalizamos al shape esperado
+        const p: Presupuesto = {
+          id: data.id,
           nombre: data.nombre,
-          descripción: data.descripción,
+          descripcion: data.descripcion, // <- sin tilde
           importe: data.importe,
           aceptado: data.aceptado,
-          condiciones: data.condiciones,
+          condiciones: data.condiciones ?? "",
+          clienteId: data.clienteId,
+          createdAt: data.createdAt,
+        };
+        setPresupuesto(p);
+        setValores({
+          nombre: p.nombre,
+          descripcion: p.descripcion,
+          importe: p.importe,
+          aceptado: p.aceptado,
+          condiciones: p.condiciones ?? "",
         });
-
+      } catch (e) {
+        console.error("Error al cargar presupuesto:", e);
+      } finally {
         setCargando(false);
-      })
-      .catch((err) => {
-        console.error("Error al cargar presupuesto", err);
-        setCargando(false);
-      });
-  }, [id]);
+      }
+    };
 
+    cargar();
+  }, [id, router]);
+
+  // -----------------------------------
+  // Cargar facturas del presupuesto
+  // -----------------------------------
   useEffect(() => {
     if (!id) return;
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/presupuestos/por-obra/${id}`, {
-      credentials: "include",
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("✅ Datos presupuestos:", data);
-        if (Array.isArray(data)) {
-          setPresupuestos(data);
-        } else {
-          console.error("❌ La respuesta no es un array:", data);
-          setPresupuestos([]); // prevenir errores en la tabla
-        }
-      })
-      .catch((err) => {
-        console.error("❌ Error al obtener presupuestos:", err);
-        setPresupuestos([]);
-      });
-  }, [id]);
+    const cargarFacturas = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/facturas/por-presupuesto/${id}`,
+          { credentials: "include" }
+        );
 
+        if (res.status === 401) {
+          if (typeof window !== "undefined") window.location.href = "/login";
+          return;
+        }
+        if (res.status === 403) {
+          router.replace("/403");
+          return;
+        }
+
+        const data = await res.json();
+        setFacturas(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Error al obtener facturas:", err);
+        setFacturas([]);
+      }
+    };
+
+    cargarFacturas();
+  }, [id, router]);
+
+  // ---------------------------
+  // Edición presupuesto
+  // ---------------------------
   const handleChange = (nombre: string, valor: any) => {
     setValores((prev: any) => ({ ...prev, [nombre]: valor }));
   };
 
   const handleSubmit = async () => {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${id}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(valores),
-        credentials: "include",
-      }
-    );
+    // Aseguramos tipos válidos
+    const payload = {
+      ...valores,
+      descripcion: valores.descripcion ?? "",
+      importe:
+        typeof valores.importe === "string"
+          ? parseFloat(valores.importe || "0")
+          : (valores.importe ?? 0),
+    };
 
-    if (res.ok) {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/presupuestos/${id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (res.status === 401) {
+        if (typeof window !== "undefined") window.location.href = "/login";
+        return;
+      }
+      if (res.status === 403) {
+        router.replace("/403");
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(
+          `Error al actualizar presupuesto${err?.error ? `: ${err.error}` : ""}`
+        );
+        return;
+      }
+
       alert("Presupuesto actualizado correctamente");
       router.push(`/obras/presupuestos/${id}`);
-    } else {
+    } catch (e) {
+      console.error(e);
       alert("Error al actualizar presupuesto");
     }
   };
 
-  if (cargando) return <p>Cargando presupuesto...</p>;
-  if (!presupuesto) return <p>No se encontró el presupuesto</p>;
-
-  const handleEliminar = async (factura: any) => {
+  // ---------------------------
+  // Eliminar factura
+  // ---------------------------
+  const handleEliminarFactura = async (f: Factura) => {
+    if (!puedeEliminarFacturas) return;
     if (
       !confirm(
-        `¿Estás seguro de eliminar la factura "${factura.numero || factura.descripcion}"?`
+        `¿Eliminar la factura "${f.numero ?? f.descripcion ?? f.referencia ?? f.id}"?`
       )
     )
       return;
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/facturas/${factura.id}`,
-        { method: "DELETE", credentials: "include" }
+        `${process.env.NEXT_PUBLIC_API_URL}/facturas/${f.id}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
       );
 
-      if (res.ok) {
-        // ✅ Actualizar el estado eliminando la factura
-        setFacturas((prev) => prev.filter((f) => f.id !== factura.id));
-        alert("Factura eliminada correctamente");
-      } else {
-        alert("Error al eliminar la factura");
+      if (res.status === 401) {
+        if (typeof window !== "undefined") window.location.href = "/login";
+        return;
       }
+      if (res.status === 403) {
+        router.replace("/403");
+        return;
+      }
+      if (!res.ok) throw new Error("Error al eliminar");
+
+      setFacturas((prev) => prev.filter((x) => x.id !== f.id));
+      alert("Factura eliminada correctamente");
     } catch (err) {
       console.error("Error al eliminar factura:", err);
       alert("No se pudo eliminar la factura");
     }
   };
 
-  return (
-    <div>
-      {/* ✅ FormularioTabla modo vista o edición */}
-      <FormularioTabla
-        titulo={modoEdicion ? "Editar Presupuesto" : "Detalle del Presupuesto"}
-        campos={campos}
-        valores={valores}
-        onChange={modoEdicion ? handleChange : undefined}
-        onSubmit={modoEdicion ? handleSubmit : undefined}
-        botonTexto="Guardar"
-        soloLectura={!modoEdicion}
-      />
-      <TablaListado
-        titulo="Facturas asociadas"
-        columnas={columnas}
-        datos={facturas}
-        onVer={(factura) =>
-          router.push(`/obras/presupuestos/facturas/${factura.id}`)
-        }
-        onEditar={(factura) =>
-          router.push(`/obras/presupuestos/facturas/${factura.id}?edit=true`)
-        }
-        onEliminar={(factura) => handleEliminar(factura.id)}
-        mostrarImportar={false}
-        registrosPorPagina={1}
-      />
-      {/* ✅ Tarjetas Empresa + Cliente */}
-      <DatosEmpresaCliente clienteId={presupuesto.clienteId} />
-      <ArbolPresupuesto presupuestoId={presupuesto.id} />
+  // ---------------------------
+  // Columnas facturas
+  // ---------------------------
+  const columnas: Columna[] = useMemo(
+    () => [
+      { clave: "referencia", encabezado: "Referencia", tipo: "texto" },
+      { clave: "descripcion", encabezado: "Descripción", tipo: "texto" },
+      {
+        clave: "createdAt",
+        encabezado: "Fecha",
+        tipo: "texto",
+        render: (valor: string) => new Date(valor).toLocaleDateString("es-ES"),
+      },
+      {
+        clave: "cantidad",
+        encabezado: "Importe",
+        tipo: "texto",
+        render: (valor: number) =>
+          typeof valor === "number" ? `${valor.toFixed(2)} €` : "0,00 €",
+      },
+      {
+        clave: "estado",
+        encabezado: "Estado",
+        tipo: "texto",
+        render: (valor: string) => (
+          <span
+            style={{
+              padding: "0.25rem 0.5rem",
+              borderRadius: "4px",
+              fontSize: "0.8rem",
+              fontWeight: "bold",
+              backgroundColor: valor === "pagado" ? "#d1fae5" : "#fef3c7",
+              color: valor === "pagado" ? "#065f46" : "#92400e",
+            }}
+          >
+            {valor || "pendiente"}
+          </span>
+        ),
+      },
+    ],
+    []
+  );
 
-      {/* ✅ Fecha fuera del formulario */}
-      {!modoEdicion && (
-        <p style={{ marginTop: "1rem" }}>
-          <strong>Generado el:</strong>{" "}
-          {new Date(presupuesto.createdAt).toLocaleDateString("es-ES")}
-        </p>
-      )}
-    </div>
+  if (cargando) return <p>Cargando presupuesto...</p>;
+  if (!presupuesto) return <p>No se encontró el presupuesto</p>;
+
+  return (
+    <RequirePermiso modulo="presupuestos" accion="ver">
+      <div>
+        {/* Formulario (editable solo si tiene permiso) */}
+        <FormularioTabla
+          titulo={
+            modoEdicion ? "Editar Presupuesto" : "Detalle del Presupuesto"
+          }
+          campos={campos}
+          valores={valores}
+          onChange={modoEdicion && puedeEditarPres ? handleChange : undefined}
+          onSubmit={modoEdicion && puedeEditarPres ? handleSubmit : undefined}
+          botonTexto="Guardar"
+          soloLectura={!modoEdicion || !puedeEditarPres}
+        />
+
+        {/* Tabla de facturas */}
+        <TablaListado
+          titulo="Facturas asociadas"
+          columnas={columnas}
+          datos={facturas}
+          onVer={
+            puedeVerFacturas
+              ? (factura) =>
+                  router.push(`/obras/presupuestos/facturas/${factura.id}`)
+              : undefined
+          }
+          onEditar={
+            puedeEditarFacturas
+              ? (factura) =>
+                  router.push(
+                    `/obras/presupuestos/facturas/${factura.id}?edit=true`
+                  )
+              : undefined
+          }
+          onEliminar={
+            puedeEliminarFacturas
+              ? (factura) => handleEliminarFactura(factura)
+              : undefined
+          }
+          mostrarImportar={false}
+          registrosPorPagina={5}
+        />
+
+        {/* Tarjetas Empresa + Cliente */}
+        <DatosEmpresaCliente clienteId={presupuesto.clienteId} />
+        <ArbolPresupuesto presupuestoId={presupuesto.id} />
+
+        {/* Fecha fuera del formulario */}
+        {!modoEdicion && (
+          <p style={{ marginTop: "1rem" }}>
+            <strong>Generado el:</strong>{" "}
+            {new Date(presupuesto.createdAt).toLocaleDateString("es-ES")}
+          </p>
+        )}
+      </div>
+    </RequirePermiso>
   );
 }

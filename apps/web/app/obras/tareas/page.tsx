@@ -3,15 +3,17 @@
 import { useEffect, useState } from "react";
 import TablaListado from "../../components/TablaListado";
 import styles from "./Tareas.module.css";
-import { useRouter } from "next/navigation";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { RequirePermiso, usePermisos } from "../../lib/permisos";
 
-type Tareas = {
+type Tarea = {
   id: number;
   nombre: string;
-  estado: string;
-  servicio: string;
+  estado?: string;
+  servicio?: string;
+  direccion?: string;
 };
+
 type EstadoValido =
   | "pendiente"
   | "en curso"
@@ -20,62 +22,93 @@ type EstadoValido =
   | "sin estado";
 
 export default function TareasPage() {
-  const [tareas, setTareas] = useState<Tareas[]>([]);
+  const [tareas, setTareas] = useState<Tarea[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { can } = usePermisos();
+
+  const puedeCrear = can("tareas", "crear");
+  const puedeEditar = can("tareas", "editar");
+  const puedeEliminar = can("tareas", "eliminar");
+
+  // (Opcional) Si algún día usas filtros por obra/servicio:
   const obraId = searchParams.get("obraId");
   const servicioId = searchParams.get("servicioId");
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras/tareas`, {
-      credentials: "include",
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("📦 Datos recibidos desde backend:", data);
+    (async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/obras/tareas`,
+          {
+            credentials: "include",
+          }
+        );
+
+        if (res.status === 401) {
+          if (typeof window !== "undefined") window.location.href = "/login";
+          return;
+        }
+        if (res.status === 403) {
+          router.replace("/403");
+          return;
+        }
+
+        const data = await res.json().catch(() => []);
         if (Array.isArray(data)) {
           setTareas(data);
+        } else if (Array.isArray(data?.tareas)) {
+          setTareas(data.tareas);
         } else {
-          console.error("❌ Error: los datos no son un array:", data);
+          console.error("❌ Los datos no son un array:", data);
           setTareas([]);
-          alert(
-            "No se encontraron tareas o la respuesta del servidor es incorrecta"
-          );
         }
-        setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("Error al obtener tareas:", err);
+        setTareas([]);
+      } finally {
         setLoading(false);
-      });
-  }, []);
+      }
+    })();
+  }, [router]);
 
-  const handleEliminar = (tarea: Tareas) => {
+  const handleEliminar = async (tarea: Tarea) => {
     if (!tarea?.id || isNaN(Number(tarea.id))) {
       alert("ID de tarea no válido");
       return;
     }
 
-    if (confirm(`¿Eliminar tarea "${tarea.nombre}"?`)) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/obras/tareas/${tarea.id}`, {
-        method: "DELETE",
-        credentials: "include",
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Error al eliminar tarea");
-          return res.json();
-        })
-        .then(() => {
-          setTareas((prev) => prev.filter((o) => o.id !== tarea.id));
-          alert("Tarea eliminada");
-        })
-        .catch((err) => {
-          console.error("❌ Error al eliminar tarea:", err);
-          alert("Error al eliminar la tarea");
-        });
+    if (!confirm(`¿Eliminar tarea "${tarea.nombre}"?`)) return;
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/obras/tareas/${tarea.id}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+
+      if (res.status === 401) {
+        if (typeof window !== "undefined") window.location.href = "/login";
+        return;
+      }
+      if (res.status === 403) {
+        router.replace("/403");
+        return;
+      }
+
+      if (!res.ok) throw new Error("Error al eliminar tarea");
+
+      setTareas((prev) => prev.filter((o) => o.id !== tarea.id));
+      alert("Tarea eliminada");
+    } catch (err) {
+      console.error("❌ Error al eliminar tarea:", err);
+      alert("Error al eliminar la tarea");
     }
   };
+
   const getEstadoFallback = (estado: string) => {
     const estadosConfig: Record<
       EstadoValido,
@@ -92,19 +125,17 @@ export default function TareasPage() {
       },
     };
 
-    // ✅ Verificar si el estado existe en el config, sino usar "sin estado"
-    const estadoKey = estado.toLowerCase() as EstadoValido;
+    const estadoKey = (estado?.toLowerCase() as EstadoValido) || "sin estado";
     return estadosConfig[estadoKey] || estadosConfig["sin estado"];
   };
+
   const columnas = [
     { clave: "nombre", encabezado: "Nombre" },
     {
       clave: "estado",
       encabezado: "Estado",
-      // ✅ Render personalizado con color e icono
-      render: (valor: string, registro: Tareas) => {
+      render: (valor: string) => {
         const estilo = getEstadoFallback(valor);
-
         return (
           <div
             style={{
@@ -114,10 +145,10 @@ export default function TareasPage() {
               padding: "0.375rem 0.75rem",
               borderRadius: "6px",
               fontSize: "0.875rem",
-              fontWeight: "500",
+              fontWeight: 500,
               color: estilo.color,
               backgroundColor: estilo.backgroundColor,
-              border: `1px solid ${estilo.color}20`, // 20 es para transparencia
+              border: `1px solid ${estilo.color}20`,
             }}
           >
             <span style={{ fontSize: "1rem" }}>{estilo.icon}</span>
@@ -130,34 +161,42 @@ export default function TareasPage() {
   ];
 
   return (
-    <main>
-      <div className={styles.tareasContainer}>
-        <div className={styles.header}>
-          <h1>Listado de tareas</h1>
-          {/**   <button
-            className={styles.botonCrear}
-            onClick={() => router.push('/obras/tareas/create')}
-          >
-            + Crear Tareas
-          </button>*/}
-        </div>
+    <RequirePermiso modulo="tareas" accion="ver">
+      <main>
+        <div className={styles.tareasContainer}>
+          <div className={styles.header}>
+            <h1>Listado de tareas</h1>
 
-        {loading ? (
-          <p>Cargando tareas...</p>
-        ) : (
-          <TablaListado
-            titulo=""
-            columnas={columnas}
-            datos={tareas}
-            onVer={(tarea) => router.push(`/obras/tareas/${tarea.id}`)}
-            onEditar={(tarea) =>
-              router.push(`/obras/tareas/${tarea.id}?edit=true`)
-            }
-            onEliminar={handleEliminar}
-            mostrarImportar={false}
-          />
-        )}
-      </div>
-    </main>
+            {puedeCrear && (
+              <button
+                className={styles.botonCrear}
+                onClick={() => router.push("/obras/tareas/create")}
+              >
+                + Crear Tarea
+              </button>
+            )}
+          </div>
+
+          {loading ? (
+            <p>Cargando tareas...</p>
+          ) : (
+            <TablaListado
+              titulo=""
+              columnas={columnas}
+              datos={tareas}
+              onVer={(tarea: Tarea) => router.push(`/obras/tareas/${tarea.id}`)}
+              onEditar={
+                puedeEditar
+                  ? (tarea: Tarea) =>
+                      router.push(`/obras/tareas/${tarea.id}?edit=true`)
+                  : undefined
+              }
+              onEliminar={puedeEliminar ? handleEliminar : undefined}
+              mostrarImportar={false}
+            />
+          )}
+        </div>
+      </main>
+    </RequirePermiso>
   );
 }

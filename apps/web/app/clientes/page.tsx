@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import TablaListado from "../components/TablaListado";
 import styles from "./clientes.module.css";
 import { useRouter } from "next/navigation";
+import { RequirePermiso, usePermisos } from "../lib/permisos";
 
 type Clientes = {
   id: number;
@@ -17,9 +18,21 @@ type Clientes = {
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Clientes[]>([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter(); // ← Aquí
+  const router = useRouter();
 
+  // ⬇️ permisos del usuario
+  const { loading: permisosLoading, can } = usePermisos();
+
+  // ⬇️ Traer datos SOLO si tiene permiso de 'ver'
   useEffect(() => {
+    if (permisosLoading) return;
+
+    if (!can("clientes", "ver")) {
+      setClientes([]);
+      setLoading(false);
+      return;
+    }
+
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes`, {
       credentials: "include",
     })
@@ -28,10 +41,10 @@ export default function ClientesPage() {
         console.log("Respuesta del backend:", data);
         if (Array.isArray(data)) {
           setClientes(data);
-        } else if (Array.isArray(data.clientes)) {
-          setClientes(data);
+        } else if (Array.isArray((data as any)?.clientes)) {
+          setClientes((data as any).clientes);
         } else {
-          console.error(" Los datos no son un array:", data);
+          console.error("Los datos no son un array:", data);
         }
         setLoading(false);
       })
@@ -39,17 +52,22 @@ export default function ClientesPage() {
         console.error("Error al obtener clientes:", err);
         setLoading(false);
       });
-  }, []);
+  }, [permisosLoading, can]);
 
-  const handleEliminar = (clientes: any) => {
-    if (confirm(`¿Eliminar clientes "${clientes.nombre}"?`)) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes/${clientes.id}`, {
+  const handleEliminar = (cliente: Clientes) => {
+    if (!can("clientes", "eliminar")) {
+      alert("Sin permiso para eliminar");
+      return;
+    }
+
+    if (confirm(`¿Eliminar cliente "${cliente.nombre}"?`)) {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/clientes/${cliente.id}`, {
         method: "DELETE",
         credentials: "include",
       })
         .then(() => {
-          setClientes((prev) => prev.filter((o) => o.id !== clientes.id));
-          alert("cliente eliminado");
+          setClientes((prev) => prev.filter((o) => o.id !== cliente.id));
+          alert("Cliente eliminado");
         })
         .catch(() => alert("Error al eliminar"));
     }
@@ -60,6 +78,7 @@ export default function ClientesPage() {
     { clave: "direccion", encabezado: "Dirección" },
     { clave: "email", encabezado: "Email" },
   ];
+
   const exportC = [
     { clave: "id", encabezado: "ID" },
     { clave: "nombre", encabezado: "Nombre" },
@@ -70,48 +89,67 @@ export default function ClientesPage() {
     { clave: "telefono", encabezado: "Teléfono" },
   ];
 
-  return (
-    <main>
-      <div className={styles.clientesContainer}>
-        <div className={styles.header}>
-          <h1>Listado de clientes</h1>
-          <button
-            className={styles.botonCrear}
-            onClick={() => router.push("/clientes/create")}
-          >
-            + Crear clientes
-          </button>
-        </div>
+  // Solo habilitamos exportar si tiene permiso
+  const exportColumns = can("clientes", "exportar") ? exportC : [];
 
-        {loading ? (
-          <p>Cargando clientes...</p>
-        ) : (
-          <TablaListado
-            titulo=""
-            columnas={columnas}
-            datos={clientes}
-            onVer={(clientes) => router.push(`/clientes/${clientes.id}`)}
-            onEditar={(clientes) =>
-              router.push(`/clientes/${clientes.id}?edit=true`)
-            }
-            onEliminar={handleEliminar}
-            registrosPorPagina={10}
-            exportC={exportC}
-            mostrarImportar={true}
-            importUrl={`${process.env.NEXT_PUBLIC_API_URL}/clientes`}
-            onImport={async () => {
-              const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/clientes`,
-                {
-                  credentials: "include",
+  // En tu definición de módulos, "clientes" NO tiene "importar".
+  // Si tu TablaListado soporta un boolean, lo atamos a can("clientes","importar") (será false) o directamente false.
+  const puedeImportar = can("clientes", "importar"); // normalmente false
+
+  return (
+    <RequirePermiso modulo="clientes" accion="ver">
+      <main>
+        <div className={styles.clientesContainer}>
+          <div className={styles.header}>
+            <h1>Listado de clientes</h1>
+
+            {/* Botón crear solo con permiso */}
+            {can("clientes", "crear") && (
+              <button
+                className={styles.botonCrear}
+                onClick={() => router.push("/clientes/create")}
+              >
+                + Crear cliente
+              </button>
+            )}
+          </div>
+
+          {loading ? (
+            <p>Cargando clientes...</p>
+          ) : (
+            <TablaListado
+              titulo=""
+              columnas={columnas}
+              datos={clientes}
+              onVer={(c) =>
+                can("clientes", "ver") && router.push(`/clientes/${c.id}`)
+              }
+              onEditar={(c) =>
+                can("clientes", "editar") &&
+                router.push(`/clientes/${c.id}?edit=true`)
+              }
+              onEliminar={handleEliminar}
+              registrosPorPagina={10}
+              exportC={exportColumns}
+              mostrarImportar={puedeImportar}
+              importUrl={`${process.env.NEXT_PUBLIC_API_URL}/clientes`}
+              onImport={async () => {
+                if (!puedeImportar) return;
+                const res = await fetch(
+                  `${process.env.NEXT_PUBLIC_API_URL}/clientes`,
+                  {
+                    credentials: "include",
+                  }
+                );
+                const nuevosDatos = await res.json();
+                if (Array.isArray(nuevosDatos)) {
+                  setClientes(nuevosDatos);
                 }
-              );
-              const nuevosDatos = await res.json();
-              setClientes(nuevosDatos);
-            }}
-          />
-        )}
-      </div>
-    </main>
+              }}
+            />
+          )}
+        </div>
+      </main>
+    </RequirePermiso>
   );
 }

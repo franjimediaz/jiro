@@ -2,47 +2,64 @@
 
 import { useEffect, useState } from "react";
 import TablaListado from "../../../components/TablaListado";
-import styles from "./Usuarios.module.css"; // o donde tengas el CSS
+import styles from "./Usuarios.module.css";
 import { useRouter } from "next/navigation";
+import { RequirePermiso, usePermisos } from "../../../lib/permisos";
 
-type usuario = {
+type Usuario = {
   id: number;
   nombre: string;
-  direccion: string;
-  fechaInicio: string;
-  fechaFin: string;
-  estado: string;
+  apellido?: string;
+  idUsuario?: string;
+  email?: string;
+  activo?: boolean;
 };
 
-export default function usuariosPage() {
-  const [usuarios, setusuarios] = useState<usuario[]>([]);
+export default function UsuariosPage() {
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter(); // ← Aquí
+  const router = useRouter();
+  const { can } = usePermisos();
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/usuarios`, {
-      credentials: "include",
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setusuarios(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error al obtener usuarios:", err);
-        setLoading(false);
-      });
-  }, []);
+    const cargar = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/usuarios`, {
+          credentials: "include",
+        });
 
-  const handleEliminar = (usuario: any) => {
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (res.status === 403) {
+          router.replace("/403");
+          return;
+        }
+
+        const data = await res.json();
+        setUsuarios(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Error al obtener usuarios:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargar();
+  }, [router]);
+
+  const handleEliminar = (usuario: Usuario) => {
+    if (!can("usuarios", "eliminar")) return;
     if (confirm(`¿Eliminar usuario "${usuario.nombre}"?`)) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/usuarios/${usuario.id}`, {
         method: "DELETE",
         credentials: "include",
       })
-        .then(() => {
-          setusuarios((prev) => prev.filter((o) => o.id !== usuario.id));
-          alert("usuario eliminada");
+        .then((res) => {
+          if (!res.ok) throw new Error("Error al eliminar");
+          setUsuarios((prev) => prev.filter((o) => o.id !== usuario.id));
+          alert("Usuario eliminado");
         })
         .catch(() => alert("Error al eliminar"));
     }
@@ -52,8 +69,9 @@ export default function usuariosPage() {
     { clave: "nombre", encabezado: "Nombre" },
     { clave: "apellido", encabezado: "Apellido" },
     { clave: "idUsuario", encabezado: "ID Usuario" },
-    { clave: "activo", encabezado: "Activo" },
+    { clave: "activo", encabezado: "Activo", tipo: "checkbox" as const },
   ];
+
   const exportC = [
     { clave: "id", encabezado: "ID" },
     { clave: "nombre", encabezado: "Nombre" },
@@ -66,47 +84,56 @@ export default function usuariosPage() {
   ];
 
   return (
-    <main>
-      <div className={styles.usuariosContainer}>
-        <div className={styles.header}>
-          <h1>Tipos Empleados</h1>
-          <button
-            className={styles.botonCrear}
-            onClick={() => router.push("/usuarios/create")}
-          >
-            + Crear usuario
-          </button>
-        </div>
+    <RequirePermiso modulo="usuarios" accion="ver" fallback={null}>
+      <main>
+        <div className={styles.usuariosContainer}>
+          <div className={styles.header}>
+            <h1>Usuarios</h1>
 
-        {loading ? (
-          <p>Cargando usuarios...</p>
-        ) : (
-          <TablaListado
-            titulo=""
-            columnas={columnas}
-            datos={usuarios}
-            onVer={(usuarios) => router.push(`/usuarios/${usuarios.id}`)}
-            onEditar={(usuarios) =>
-              router.push(`/usuarios/${usuarios.id}?edit=true`)
-            }
-            onEliminar={handleEliminar}
-            registrosPorPagina={10}
-            exportC={exportC}
-            mostrarImportar={true}
-            importUrl={`${process.env.NEXT_PUBLIC_API_URL}/usuarios`}
-            onImport={async () => {
-              const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/usuarios`,
-                {
-                  credentials: "include",
-                }
-              );
-              const nuevosDatos = await res.json();
-              setusuarios(nuevosDatos);
-            }}
-          />
-        )}
-      </div>
-    </main>
+            {can("usuarios", "crear") && (
+              <button
+                className={styles.botonCrear}
+                onClick={() => router.push("/usuarios/create")}
+              >
+                + Crear usuario
+              </button>
+            )}
+          </div>
+
+          {loading ? (
+            <p>Cargando usuarios...</p>
+          ) : (
+            <TablaListado
+              titulo=""
+              columnas={columnas}
+              datos={usuarios}
+              onVer={(u: Usuario) => router.push(`/usuarios/${u.id}`)}
+              onEditar={
+                can("usuarios", "editar")
+                  ? (u: Usuario) => router.push(`/usuarios/${u.id}?edit=true`)
+                  : undefined
+              }
+              onEliminar={
+                can("usuarios", "eliminar")
+                  ? (u: Usuario) => handleEliminar(u)
+                  : undefined
+              }
+              registrosPorPagina={10}
+              exportC={exportC}
+              mostrarImportar={true}
+              importUrl={`${process.env.NEXT_PUBLIC_API_URL}/usuarios`}
+              onImport={async () => {
+                const res = await fetch(
+                  `${process.env.NEXT_PUBLIC_API_URL}/usuarios`,
+                  { credentials: "include" }
+                );
+                const nuevosDatos = await res.json();
+                setUsuarios(Array.isArray(nuevosDatos) ? nuevosDatos : []);
+              }}
+            />
+          )}
+        </div>
+      </main>
+    </RequirePermiso>
   );
 }

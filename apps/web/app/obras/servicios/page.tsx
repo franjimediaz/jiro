@@ -1,58 +1,99 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import TablaListado from "../../components/TablaListado";
-import styles from "./Servicios.module.css"; // o donde tengas el CSS
+import TablaListado, { type Columna } from "../../components/TablaListado";
+import styles from "./Servicios.module.css";
 import { useRouter } from "next/navigation";
+import { RequirePermiso, usePermisos } from "../../lib/permisos";
 
 type Servicio = {
   id: number;
   nombre: string;
-  direccion: string;
-  fechaInicio: string;
-  fechaFin: string;
-  estado: string;
+  color: string;
+  icono: string;
 };
 
 export default function ServiciosPage() {
-  const [Servicios, setServicios] = useState<Servicio[]>([]);
+  const [servicios, setServicios] = useState<Servicio[]>([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter(); // ← Aquí
+  const router = useRouter();
+  const { can } = usePermisos();
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios`, {
-      credentials: "include",
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setServicios(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error al obtener Servicios:", err);
-        setLoading(false);
-      });
-  }, []);
+    const cargar = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/servicios`,
+          {
+            credentials: "include",
+          }
+        );
 
-  const handleEliminar = (Servicio: any) => {
-    if (confirm(`¿Eliminar Servicio "${Servicio.nombre}"?`)) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios/${Servicio.id}`, {
-        method: "DELETE",
-        credentials: "include",
-      })
-        .then(() => {
-          setServicios((prev) => prev.filter((o) => o.id !== Servicio.id));
-          alert("Servicio eliminada");
-        })
-        .catch(() => alert("Error al eliminar"));
+        if (res.status === 401) {
+          if (typeof window !== "undefined") window.location.href = "/login";
+          return;
+        }
+        if (res.status === 403) {
+          router.replace("/403");
+          return;
+        }
+
+        const data = await res.json();
+        setServicios(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Error al obtener Servicios:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargar();
+  }, [router]);
+
+  const handleEliminar = async (servicio: Servicio) => {
+    if (!can("servicios", "eliminar")) {
+      router.replace("/403");
+      return;
+    }
+
+    if (!confirm(`¿Eliminar servicio "${servicio.nombre}"?`)) return;
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/servicios/${servicio.id}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+
+      if (res.status === 401) {
+        if (typeof window !== "undefined") window.location.href = "/login";
+        return;
+      }
+      if (res.status === 403) {
+        router.replace("/403");
+        return;
+      }
+
+      if (res.ok) {
+        setServicios((prev) => prev.filter((o) => o.id !== servicio.id));
+        alert("Servicio eliminado");
+      } else {
+        alert("Error al eliminar el servicio");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar");
     }
   };
 
-  const columnas = [
+  const columnas: Columna[] = [
     { clave: "nombre", encabezado: "Nombre" },
     { clave: "color", encabezado: "Color" },
     { clave: "icono", encabezado: "Icono" },
   ];
+
   const exportC = [
     { clave: "id", encabezado: "Id" },
     { clave: "nombre", encabezado: "Nombre" },
@@ -61,49 +102,72 @@ export default function ServiciosPage() {
   ];
 
   return (
-    <main>
-      <div className={styles.ServiciosContainer}>
-        <div className={styles.header}>
-          <h1>Listado de Servicios</h1>
-          <button
-            className={styles.botonCrear}
-            onClick={() => router.push("/obras/servicios/create")}
-          >
-            + Crear Servicio
-          </button>
-        </div>
+    <RequirePermiso modulo="servicios" accion="ver">
+      <main>
+        <div className={styles.ServiciosContainer}>
+          <div className={styles.header}>
+            <h1>Listado de Servicios</h1>
 
-        {loading ? (
-          <p>Cargando Servicios...</p>
-        ) : (
-          <TablaListado
-            titulo=""
-            columnas={columnas}
-            datos={Servicios}
-            onVer={(Servicios) =>
-              router.push(`/obras/servicios/${Servicios.id}`)
-            }
-            onEditar={(Servicios) =>
-              router.push(`/obras/servicios/${Servicios.id}?edit=true`)
-            }
-            onEliminar={handleEliminar}
-            registrosPorPagina={10}
-            exportC={exportC}
-            mostrarImportar={true}
-            importUrl={`${process.env.NEXT_PUBLIC_API_URL}/servicios`}
-            onImport={async () => {
-              const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/servicios`,
-                {
-                  credentials: "include",
+            {can("servicios", "crear") && (
+              <button
+                className={styles.botonCrear}
+                onClick={() => router.push("/obras/servicios/create")}
+              >
+                + Crear Servicio
+              </button>
+            )}
+          </div>
+
+          {loading ? (
+            <p>Cargando Servicios...</p>
+          ) : (
+            <TablaListado
+              titulo=""
+              columnas={columnas}
+              datos={servicios}
+              onVer={(s) => router.push(`/obras/servicios/${s.id}`)}
+              onEditar={
+                can("servicios", "editar")
+                  ? (s) => router.push(`/obras/servicios/${s.id}?edit=true`)
+                  : undefined
+              }
+              onEliminar={
+                can("servicios", "eliminar") ? handleEliminar : undefined
+              }
+              registrosPorPagina={10}
+              exportC={exportC}
+              mostrarImportar={true}
+              importUrl={`${process.env.NEXT_PUBLIC_API_URL}/servicios`}
+              onImport={async () => {
+                try {
+                  const res = await fetch(
+                    `${process.env.NEXT_PUBLIC_API_URL}/servicios`,
+                    { credentials: "include" }
+                  );
+
+                  if (res.status === 401) {
+                    if (typeof window !== "undefined")
+                      window.location.href = "/login";
+                    return;
+                  }
+                  if (res.status === 403) {
+                    router.replace("/403");
+                    return;
+                  }
+
+                  const nuevosDatos = await res.json();
+                  setServicios(Array.isArray(nuevosDatos) ? nuevosDatos : []);
+                } catch (e) {
+                  console.error(
+                    "Error al refrescar servicios tras importar:",
+                    e
+                  );
                 }
-              );
-              const nuevosDatos = await res.json();
-              setServicios(nuevosDatos);
-            }}
-          />
-        )}
-      </div>
-    </main>
+              }}
+            />
+          )}
+        </div>
+      </main>
+    </RequirePermiso>
   );
 }

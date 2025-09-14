@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import FormularioTabla from "../../../components/FormularioTabla";
+import { RequirePermiso, usePermisos } from "../../../lib/permisos";
 
 const secciones = [
   {
@@ -20,7 +21,7 @@ const secciones = [
         campoLabel: "nombre",
         campoValue: "id",
       },
-      { nombre: "estado", etiqueta: "Estado" },
+      { nombre: "estado", etiqueta: "Activo", tipo: "checkbox" },
       { nombre: "nombre", etiqueta: "Nombre" },
       { nombre: "apellidos", etiqueta: "Apellidos" },
       { nombre: "displayName", etiqueta: "Display Name" },
@@ -71,8 +72,8 @@ const secciones = [
         tabla: "directorios",
         campoLabel: "nombre",
         campoValue: "id",
+        multiple: true,
       },
-
       { nombre: "rol", etiqueta: "Rol" },
       { nombre: "jornada", etiqueta: "Jornada" },
       { nombre: "turno", etiqueta: "Turno" },
@@ -151,70 +152,171 @@ const secciones = [
   },
 ];
 
-export default function VerEditarUsuario() {
+export default function VerEditarDirectorio() {
   const { id } = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { can } = usePermisos();
 
   const modoEdicion = searchParams.get("edit") === "true";
-  const [valores, setValores] = useState({
+  const puedeEditar = can("directorios", "editar");
+
+  const [valores, setValores] = useState<any>({
+    id: "",
+    tipo: "",
+    estado: true,
     nombre: "",
-    idUsuario: "",
-    apellido: "",
+    apellidos: "",
+    displayName: "",
+    dni: "",
+    fotoUrl: "",
     email: "",
-    password: "",
+    emailPersonal: "",
     telefono: "",
+    telefono2: "",
+    calendarEmail: "",
+    puesto: "",
+    departamentoId: "",
+    supervisorId: "",
+    subordinados: [],
     rol: "",
-    activo: "",
+    jornada: "",
+    turno: "",
+    usuarioId: "",
+    empresaExternaId: "",
+    costeHora: "",
+    tarifaFacturacionHora: "",
+    moneda: "EUR",
+    capacidadSemanalHoras: "",
+    tienePRL: false,
+    prlVencimiento: "",
+    rcVigente: false,
+    rcVencimiento: "",
+    ubicacionCiudad: "",
+    ubicacionProvincia: "",
+    ubicacionPais: "",
+    fechaAlta: "",
+    fechaBaja: "",
+    observaciones: "",
+    tags: [],
   });
+
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/usuarios/${id}`, {
-      credentials: "include",
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setValores(data);
-        setCargando(false);
-        console.log(data);
-      })
-      .catch((err) => {
-        console.error("Error al obtener Usuario:", err);
+    if (!id) return;
 
+    const cargar = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/directorios/${id}`,
+          { credentials: "include" }
+        );
+
+        if (res.status === 401) {
+          if (typeof window !== "undefined") window.location.href = "/login";
+          return;
+        }
+        if (res.status === 403) {
+          router.replace("/403");
+          return;
+        }
+
+        const data = await res.json();
+        // Normalización ligera de tipos
+        setValores({
+          ...data,
+          estado: Boolean(data.estado),
+          tienePRL: Boolean(data.tienePRL),
+          rcVigente: Boolean(data.rcVigente),
+          tags: Array.isArray(data.tags) ? data.tags : [],
+          subordinados: Array.isArray(data.subordinados)
+            ? data.subordinados
+            : [],
+          moneda: data.moneda || "EUR",
+        });
+      } catch (err) {
+        console.error("Error al obtener Directorio:", err);
+      } finally {
         setCargando(false);
-      });
-  }, [id]);
+      }
+    };
+
+    cargar();
+  }, [id, router]);
 
   const handleChange = (nombre: string, valor: any) => {
-    setValores((prev) => ({ ...prev, [nombre]: valor }));
+    setValores((prev: any) => ({ ...prev, [nombre]: valor }));
   };
 
   const handleSubmit = async () => {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/Usuarios/${id}`,
-      {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(valores),
-      }
-    );
+    if (!puedeEditar) {
+      alert("No tienes permisos para editar directorios.");
+      router.replace("/403");
+      return;
+    }
 
-    if (res.ok) {
-      alert("Usuario actualizado");
-      router.push("/Usuarios");
-    } else {
-      alert("Error al actualizar");
+    const payload = {
+      ...valores,
+      estado: Boolean(valores.estado),
+      tienePRL: Boolean(valores.tienePRL),
+      rcVigente: Boolean(valores.rcVigente),
+      capacidadSemanalHoras: valores.capacidadSemanalHoras
+        ? Number(valores.capacidadSemanalHoras)
+        : null,
+      costeHora: valores.costeHora ? Number(valores.costeHora) : null,
+      tarifaFacturacionHora: valores.tarifaFacturacionHora
+        ? Number(valores.tarifaFacturacionHora)
+        : null,
+      tags: Array.isArray(valores.tags)
+        ? valores.tags
+        : typeof valores.tags === "string" && valores.tags.trim()
+          ? valores.tags.split(",").map((t: string) => t.trim())
+          : [],
+    };
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/directorios/${id}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (res.status === 401) {
+        if (typeof window !== "undefined") window.location.href = "/login";
+        return;
+      }
+      if (res.status === 403) {
+        router.replace("/403");
+        return;
+      }
+
+      if (res.ok) {
+        alert("Directorio actualizado");
+        router.push("/usuarios/directorios");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(
+          "Error al actualizar: " +
+            (data?.error || data?.message || "desconocido")
+        );
+      }
+    } catch (err) {
+      console.error("Error al actualizar Directorio:", err);
+      alert("No se pudo actualizar el directorio. Revisa la consola.");
     }
   };
 
-  if (cargando) return <p>Cargando Usuario...</p>;
+  if (cargando) return <p>Cargando Directorio...</p>;
 
   return (
-    <>
+    <RequirePermiso modulo="directorios" accion="ver" fallback={null}>
       <FormularioTabla
-        titulo={modoEdicion ? "Editar Usuario" : "Detalle del Usuario"}
+        titulo={modoEdicion ? "Editar Directorio" : "Detalle del Directorio"}
         secciones={secciones}
         valores={valores}
         onChange={modoEdicion ? handleChange : undefined}
@@ -222,6 +324,6 @@ export default function VerEditarUsuario() {
         botonTexto="Guardar cambios"
         soloLectura={!modoEdicion}
       />
-    </>
+    </RequirePermiso>
   );
 }

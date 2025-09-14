@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import FormularioTabla from "../../../components/FormularioTabla";
 import PermisosSelector from "../../../components/PermisosSelector";
+import { RequirePermiso } from "../../../lib/permisos";
 import { PermisosRol, ValoresFormularioRol } from "../../../../types/roles";
 
 // ✅ Extender la interfaz para incluir ID
 interface ValoresFormularioRolConId extends ValoresFormularioRol {
   id?: number;
 }
+
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 
 export default function VerEditarRol() {
   const { id } = useParams();
@@ -45,78 +48,62 @@ export default function VerEditarRol() {
         }
 
         // ✅ Convertir a número para validar
-        const rolId = parseInt(id);
-        if (isNaN(rolId)) {
+        const rolId = parseInt(id as string, 10);
+        if (Number.isNaN(rolId)) {
           throw new Error("El ID debe ser un número válido");
         }
 
-        console.log(`🔍 Cargando rol con ID: ${rolId} (número)`);
+        const res = await fetch(`${API_BASE}/roles/${rolId}`, {
+          method: "GET",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
 
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/roles/${rolId}`, // ✅ Usar número
-          {
-            method: "GET",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        console.log(
-          `📡 Respuesta del servidor: ${res.status} ${res.statusText}`
-        );
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
 
         if (!res.ok) {
           let errorMessage = `Error ${res.status}: ${res.statusText}`;
-
           try {
             const errorData = await res.json();
             errorMessage = errorData.error || errorMessage;
-            console.error("❌ Error del servidor:", errorData);
-          } catch (e) {
-            console.error("❌ Error al parsear respuesta de error:", e);
+          } catch {
+            /* noop */
           }
-
           throw new Error(errorMessage);
         }
 
         const data = await res.json();
-        console.log("✅ Datos del rol recibidos:", {
-          id: data.id,
-          nombre: data.nombre,
-          tienePermisos: !!data.permisos,
-        });
 
-        // ✅ Parsear permisos de JSON string a objeto
-        let permisosParseados = {};
+        // ✅ Parsear permisos (puede venir como string u objeto)
+        let permisosParseados: PermisosRol = {};
         if (data.permisos) {
           try {
-            permisosParseados = JSON.parse(data.permisos);
-            console.log("✅ Permisos parseados correctamente");
-          } catch (e) {
-            console.warn(
-              "⚠️ Error al parsear permisos, usando objeto vacío:",
-              e
-            );
+            permisosParseados =
+              typeof data.permisos === "string"
+                ? JSON.parse(data.permisos)
+                : data.permisos;
+          } catch {
             permisosParseados = {};
           }
-        } else {
-          console.log("ℹ️ El rol no tiene permisos definidos");
         }
 
-        // ✅ Incluir el ID en el estado (como número)
         setValores({
-          ...data,
-          id: data.id, // ✅ Mantener como número
+          id: data.id,
+          nombre: data.nombre ?? "",
+          descripcion: data.descripcion ?? "",
+          nivel:
+            typeof data.nivel === "number"
+              ? data.nivel
+              : Number(data.nivel) || 1,
+          activo: Boolean(data.activo),
           permisos: permisosParseados,
-          createdAt: new Date(data.createdAt),
-          updatedAt: new Date(data.updatedAt),
+          createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+          updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
         });
-
-        console.log("✅ Estado actualizado correctamente");
       } catch (err) {
-        console.error("❌ Error al obtener rol:", err);
         const errorMessage =
           err instanceof Error
             ? err.message
@@ -133,9 +120,9 @@ export default function VerEditarRol() {
       setError("No se proporcionó un ID de rol válido");
       setCargando(false);
     }
-  }, [id]);
+  }, [id, router]);
 
-  const campos = [
+  const secciones = [
     {
       titulo: "Información del Rol",
       descripcion: modoEdicion
@@ -171,39 +158,6 @@ export default function VerEditarRol() {
         },
       ],
     },
-    // ✅ Información adicional solo en modo vista
-    ...(!modoEdicion
-      ? [
-          {
-            titulo: "Información del Sistema",
-            descripcion: "Datos automáticos del sistema",
-            expandible: true,
-            expandidaPorDefecto: false,
-            campos: [
-              {
-                nombre: "id",
-                etiqueta: "ID",
-                tipo: "text",
-                readonly: true,
-              },
-              {
-                nombre: "createdAt",
-                etiqueta: "Fecha de Creación",
-                tipo: "datetime-local",
-                readonly: true,
-                valor: valores.createdAt?.toISOString().slice(0, 16), // ✅ Formatear para datetime-local
-              },
-              {
-                nombre: "updatedAt",
-                etiqueta: "Última Actualización",
-                tipo: "datetime-local",
-                readonly: true,
-                valor: valores.updatedAt?.toISOString().slice(0, 16), // ✅ Formatear para datetime-local
-              },
-            ],
-          },
-        ]
-      : []),
   ];
 
   const handleChange = (nombre: string, valor: any) => {
@@ -222,9 +176,16 @@ export default function VerEditarRol() {
         return;
       }
 
+      const nivelNum = parseInt(String(valores.nivel || 1), 10);
+      if (Number.isNaN(nivelNum) || nivelNum < 1 || nivelNum > 10) {
+        alert("El nivel debe estar entre 1 y 10.");
+        return;
+      }
+
       // ✅ Verificar que tenga al menos un permiso
-      const tienePermisos = Object.values(valores.permisos).some(
-        (moduloPermisos: any) => Object.values(moduloPermisos).some(Boolean)
+      const tienePermisos = Object.values(valores.permisos || {}).some(
+        (moduloPermisos: any) =>
+          Object.values(moduloPermisos || {}).some(Boolean)
       );
 
       if (!tienePermisos) {
@@ -232,27 +193,31 @@ export default function VerEditarRol() {
         return;
       }
 
-      // ✅ Preparar datos para enviar (sin incluir ID)
+      // ✅ Preparar datos para enviar
       const datosRol = {
         nombre: valores.nombre.trim(),
         descripcion: valores.descripcion?.trim() || null,
-        nivel: parseInt(valores.nivel.toString()) || 1,
-        activo: valores.activo,
-        permisos: JSON.stringify(valores.permisos), // ✅ Convertir a JSON string
+        nivel: nivelNum,
+        activo: !!valores.activo,
+        permisos: JSON.stringify(valores.permisos),
       };
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/roles/${id}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(datosRol),
-        }
-      );
+      const rolId = parseInt(id as string, 10);
+
+      const res = await fetch(`${API_BASE}/roles/${rolId}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(datosRol),
+      });
+
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
 
       if (!res.ok) {
-        const error = await res.json();
+        const error = await res.json().catch(() => ({}));
         throw new Error(error.error || "Error al actualizar el rol");
       }
 
@@ -263,7 +228,6 @@ export default function VerEditarRol() {
       if (redirigir) {
         router.push("/system/roles");
       } else {
-        // Recargar la página en modo vista
         router.push(`/system/roles/${id}`);
       }
     } catch (error) {
@@ -322,79 +286,97 @@ export default function VerEditarRol() {
     );
   }
 
-  // ✅ Calcular estadísticas de permisos para el header
-  const calcularEstadisticas = () => {
-    let totalPermisos = 0;
-    let permisosActivos = 0;
-
-    Object.values(valores.permisos).forEach((moduloPermisos: any) => {
-      const permisosArray = Object.values(moduloPermisos);
-      totalPermisos += permisosArray.length;
-      permisosActivos += permisosArray.filter(Boolean).length;
-    });
-
-    return { totalPermisos, permisosActivos };
-  };
-
-  const stats = calcularEstadisticas();
+  // ✅ Info sistema (solo vista)
+  const InfoSistema = () =>
+    !modoEdicion ? (
+      <div
+        style={{
+          marginTop: 16,
+          padding: 12,
+          border: "1px solid #eee",
+          borderRadius: 8,
+          background: "#fafafa",
+          fontSize: 14,
+          lineHeight: 1.6,
+        }}
+      >
+        <strong>ID:</strong> {valores.id ?? "—"}
+        <br />
+        <strong>Creado:</strong>{" "}
+        {valores.createdAt ? new Date(valores.createdAt).toLocaleString() : "—"}
+        <br />
+        <strong>Actualizado:</strong>{" "}
+        {valores.updatedAt ? new Date(valores.updatedAt).toLocaleString() : "—"}
+      </div>
+    ) : null;
 
   return (
-    <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px" }}>
-      {/* ✅ Formulario básico */}
-      <h1 style={{ margin: 0 }}>
-        {modoEdicion ? "Editar Rol" : "Detalle del Rol"}:{" "}
-        {valores.nombre || "Cargando..."}
-      </h1>
-      <FormularioTabla
-        titulo=""
-        secciones={campos}
-        valores={valores}
-        onChange={modoEdicion ? handleChange : undefined}
-        onSubmit={modoEdicion ? handleSubmit : undefined}
-        botonTexto="Guardar Cambios"
-        soloLectura={!modoEdicion}
-      />
+    <RequirePermiso
+      modulo="roles"
+      accion={modoEdicion ? "editar" : "ver"}
+      fallback={null}
+    >
+      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px" }}>
+        {/* Título */}
+        <h1 style={{ margin: 0 }}>
+          {modoEdicion ? "Editar Rol" : "Detalle del Rol"}:{" "}
+          {valores.nombre || "—"}
+        </h1>
 
-      {/* ✅ Selector de permisos */}
-      <div style={{ marginTop: "24px" }}>
-        <PermisosSelector
-          permisos={valores.permisos}
-          onChange={handlePermisosChange}
-          readonly={!modoEdicion} // ✅ Solo lectura si no está en modo edición
-          showStats={true}
-          showTemplates={modoEdicion} // ✅ Solo mostrar plantillas en modo edición
+        {/* Formulario básico */}
+        <FormularioTabla
+          titulo=""
+          secciones={secciones}
+          valores={valores}
+          onChange={modoEdicion ? handleChange : undefined}
+          onSubmit={modoEdicion ? handleSubmit : undefined}
+          botonTexto="Guardar Cambios"
+          soloLectura={!modoEdicion}
         />
-      </div>
 
-      {/* ✅ Vista previa JSON (solo en desarrollo y modo edición) */}
-      {process.env.NODE_ENV === "development" && modoEdicion && (
-        <details style={{ marginTop: "24px" }}>
-          <summary
-            style={{
-              cursor: "pointer",
-              padding: "8px",
-              backgroundColor: "#f8f9fa",
-              borderRadius: "4px",
-            }}
-          >
-            🔍 Vista previa JSON de Permisos (Dev)
-          </summary>
-          <pre
-            style={{
-              fontSize: "11px",
-              overflow: "auto",
-              maxHeight: "300px",
-              backgroundColor: "#f8f9fa",
-              padding: "12px",
-              borderRadius: "4px",
-              border: "1px solid #ddd",
-              marginTop: "8px",
-            }}
-          >
-            {JSON.stringify(valores.permisos, null, 2)}
-          </pre>
-        </details>
-      )}
-    </div>
+        <InfoSistema />
+
+        {/* Selector de permisos */}
+        <div style={{ marginTop: "24px" }}>
+          <PermisosSelector
+            permisos={valores.permisos}
+            onChange={handlePermisosChange}
+            readonly={!modoEdicion}
+            showStats={true}
+            showTemplates={modoEdicion}
+          />
+        </div>
+
+        {/* Vista previa JSON (solo en desarrollo y modo edición) */}
+        {process.env.NODE_ENV === "development" && modoEdicion && (
+          <details style={{ marginTop: "24px" }}>
+            <summary
+              style={{
+                cursor: "pointer",
+                padding: "8px",
+                backgroundColor: "#f8f9fa",
+                borderRadius: "4px",
+              }}
+            >
+              🔍 Vista previa JSON de Permisos (Dev)
+            </summary>
+            <pre
+              style={{
+                fontSize: "11px",
+                overflow: "auto",
+                maxHeight: "300px",
+                backgroundColor: "#f8f9fa",
+                padding: "12px",
+                borderRadius: "4px",
+                border: "1px solid #ddd",
+                marginTop: "8px",
+              }}
+            >
+              {JSON.stringify(valores.permisos, null, 2)}
+            </pre>
+          </details>
+        )}
+      </div>
+    </RequirePermiso>
   );
 }
