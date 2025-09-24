@@ -565,6 +565,18 @@ app.get("/materiales", async (req, res) => {
     res.status(500).json({ error: "Error al obtener materiales" });
   }
 });
+app.get("/materiales/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  try {
+    const material = await prisma.materiales.findUnique({ where: { id } });
+    if (!material)
+      return res.status(404).json({ error: "Material no encontrado" });
+    res.json(material);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al obtener material" });
+  }
+});
 app.get("/servicios/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   try {

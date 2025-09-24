@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import FormularioTabla from "../../components/FormularioTabla";
+import { FormularioTabla } from "@repo/ui";
+import { CampoFormulario } from "@repo/shared/types";
 import { RequirePermiso } from "../../lib/permisos";
 
-const campos = [
+const campos: CampoFormulario[] = [
   { nombre: "nombre", etiqueta: "Nombre del material" },
   { nombre: "descripcion", etiqueta: "Descripción" },
   { nombre: "precio", etiqueta: "Precio (€)" },

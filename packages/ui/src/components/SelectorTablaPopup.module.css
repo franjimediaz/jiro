@@ -1,0 +1,92 @@
+.wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* El botón o caja que lanza el selector */
+.selector {
+  padding: 0.85rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
+  background: #f9fafb;
+  font-size: 1rem;
+  color: #111827;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.selector:hover {
+  background-color: #f3f4f6;
+}
+
+/* Fondo oscuro del modal */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
+}
+
+/* Contenedor del popup modal */
+.popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 95%;
+  max-width: 420px;
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+  z-index: 1001;
+}
+
+/* Input de búsqueda */
+.busqueda {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  font-size: 1rem;
+  background-color: #f9fafb;
+}
+
+.busqueda:focus {
+  outline: none;
+  border-color: #6366f1;
+  background-color: #eef2ff;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+/* Lista de opciones */
+.lista {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border-top: 1px solid #e5e7eb;
+}
+
+.item {
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  color: #1f2937;
+}
+
+.item:hover {
+  background-color: #e0e7ff;
+  color: #1e3a8a;
+}
+
+.activo {
+  background-color: #c7d2fe;
+  color: #3730a3;
+  font-weight: 600;
+}
