@@ -19,7 +19,7 @@ type Perfil = {
 };
 
 const campos = [
-  { nombre: "email", etiqueta: "Email", readOnly: true },
+  { nombre: "email", etiqueta: "Emaill", readOnly: true },
   { nombre: "nombre", etiqueta: "Nombre" },
   { nombre: "apellidos", etiqueta: "Apellidos" },
   { nombre: "rol", etiqueta: "Rol", readOnly: true },
