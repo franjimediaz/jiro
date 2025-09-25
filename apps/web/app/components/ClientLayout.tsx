@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import React from "react";
-import { PermisosProvider } from "../lib/permisos";
+import PermisosProvider from "../lib/permisos";
 
 export default function ClientLayout({
   children,

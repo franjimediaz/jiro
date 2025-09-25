@@ -5,9 +5,12 @@
   "scripts": {
     "dev": "node index.js",
     "migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate",
     "migrate:dev": "prisma db push",
     "generate": "prisma generate",
-    "studio": "prisma studio"
+    "studio": "prisma studio",
+    "lint": "echo \"No lint configured\"",
+    "check-types": "echo \"No type checking configured\""
   },
   "keywords": [],
   "author": "",

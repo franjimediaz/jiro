@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useEffect, useState, useRef } from "react";
 import styles from "./SelectorTablaPopup.module.css";
 import * as LucideIcons from "lucide-react";

@@ -6,6 +6,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import Color from "@tiptap/extension-color";
 import TextStyle from "@tiptap/extension-text-style";
 import Highlight from "@tiptap/extension-highlight";
+import React from "react"; // ✅ Añadir import explícito
 
 import styles from "./RichTextEditor.module.css";
 
@@ -39,24 +40,28 @@ export default function RichTextEditor({ value, onChange }: Props) {
       <div className={styles.toolbar}>
         {/* Botones clásicos */}
         <button
+          type="button"
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={editor.isActive("bold") ? styles.active : ""}
         >
           B
         </button>
         <button
+          type="button"
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={editor.isActive("italic") ? styles.active : ""}
         >
           I
         </button>
         <button
+          type="button"
           onClick={() => editor.chain().focus().toggleUnderline().run()}
           className={editor.isActive("underline") ? styles.active : ""}
         >
           U
         </button>
         <button
+          type="button"
           onClick={() => editor.chain().focus().toggleStrike().run()}
           className={editor.isActive("strike") ? styles.active : ""}
         >
@@ -92,30 +97,35 @@ export default function RichTextEditor({ value, onChange }: Props) {
 
         {/* Listas, encabezados, alineación */}
         <button
+          type="button"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           className={editor.isActive("bulletList") ? styles.active : ""}
         >
           • Lista
         </button>
         <button
+          type="button"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           className={editor.isActive("orderedList") ? styles.active : ""}
         >
           1. Lista
         </button>
         <button
+          type="button"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           className={editor.isActive("blockquote") ? styles.active : ""}
         >
           ❝
         </button>
         <button
+          type="button"
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
           className={editor.isActive("codeBlock") ? styles.active : ""}
         >
           {"</>"}
         </button>
         <button
+          type="button"
           onClick={() =>
             editor.chain().focus().toggleHeading({ level: 1 }).run()
           }
@@ -126,6 +136,7 @@ export default function RichTextEditor({ value, onChange }: Props) {
           H1
         </button>
         <button
+          type="button"
           onClick={() =>
             editor.chain().focus().toggleHeading({ level: 2 }).run()
           }
@@ -136,6 +147,7 @@ export default function RichTextEditor({ value, onChange }: Props) {
           H2
         </button>
         <button
+          type="button"
           onClick={() =>
             editor.chain().focus().toggleHeading({ level: 3 }).run()
           }
@@ -146,6 +158,7 @@ export default function RichTextEditor({ value, onChange }: Props) {
           H3
         </button>
         <button
+          type="button"
           onClick={() => editor.chain().focus().setTextAlign("left").run()}
           className={
             editor.isActive({ textAlign: "left" }) ? styles.active : ""
@@ -154,6 +167,7 @@ export default function RichTextEditor({ value, onChange }: Props) {
           ⯇
         </button>
         <button
+          type="button"
           onClick={() => editor.chain().focus().setTextAlign("center").run()}
           className={
             editor.isActive({ textAlign: "center" }) ? styles.active : ""
@@ -162,6 +176,7 @@ export default function RichTextEditor({ value, onChange }: Props) {
           ≡
         </button>
         <button
+          type="button"
           onClick={() => editor.chain().focus().setTextAlign("right").run()}
           className={
             editor.isActive({ textAlign: "right" }) ? styles.active : ""
@@ -171,7 +186,11 @@ export default function RichTextEditor({ value, onChange }: Props) {
         </button>
       </div>
 
-      <EditorContent editor={editor} className={styles.editorArea} />
+      {/* ✅ Casting explícito para solucionar el error de tipos */}
+      {React.createElement(EditorContent as React.ComponentType<any>, {
+        editor,
+        className: styles.editorArea,
+      })}
     </div>
   );
 }

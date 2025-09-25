@@ -8,8 +8,8 @@ import {
   ClienteInfo,
   EmpresaBranding,
   ArbolPresupuestoProps,
-} from "../../types/presupuesto";
-import ModalGenerarFactura from "../obras/presupuestos/utils/ModalGenerarFactura";
+} from "@repo/shared";
+import ModalGenerarFactura from "./utils/ModalGenerarFactura";
 import { useRouter } from "next/navigation";
 interface ServicioPresupuestoConId extends ServicioPresupuesto {
   id: number; // id del Presupuesto_Servicio

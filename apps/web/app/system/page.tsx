@@ -1,6 +1,5 @@
 "use client";
 import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
 import styles from "./page.module.css";
 import FormularioTabla from "../components/FormularioTabla";
 
@@ -206,9 +205,6 @@ export default function Home() {
             Read our docs
           </a>
         </div>
-        <Button appName="docs" className={styles.secondary}>
-          Open alert
-        </Button>
         <button
           onClick={eliminarTodo}
           style={{ backgroundColor: "red", color: "white" }}

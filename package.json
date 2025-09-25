@@ -2,7 +2,8 @@
   "name": "JiRo",
   "private": true,
   "scripts": {
-    "build": "turbo run build",
+    "build": "turbo run build --filter=web --filter=@repo/ui --filter=@repo/shared",
+    "build:all": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
