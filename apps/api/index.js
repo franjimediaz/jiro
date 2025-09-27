@@ -9,6 +9,7 @@ const path = require("path");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const app = express();
+app.set("trust proxy", 1);
 const prisma = new PrismaClient();
 const loginRouter = require("./routes/login");
 const cookieParser = require("cookie-parser");
@@ -200,8 +201,11 @@ app.post("/login", async (req, res) => {
     // Enviar como cookie
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: true, // activar en producción
+      //secure: process.env.NODE_ENV === "production", // desactivar en producción
+      sameSite: "none", // activar en producción
+      // sameSite: "lax", // desactivar en producción
+      path: "/",
       maxAge: 24 * 60 * 60 * 1000, // 1 día
     });
 
