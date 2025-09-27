@@ -1,7 +1,7 @@
 "use client";
 import Image, { type ImageProps } from "next/image";
 import styles from "./page.module.css";
-import FormularioTabla from "../components/FormularioTabla";
+import { FormularioTabla } from "@repo/ui";
 
 type Props = Omit<ImageProps, "src"> & {
   srcLight: string;

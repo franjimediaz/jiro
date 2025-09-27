@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import TablaListado from "../../components/TablaListado";
+import { TablaListado } from "@repo/ui";
 import styles from "./Roles.module.css";
 import { useRouter } from "next/navigation";
-import type { Columna } from "../../components/TablaListado";
+import { Columna } from "@repo/shared/types";
 import { RequirePermiso, usePermisos } from "../../lib/permisos";
 
 type Rol = {

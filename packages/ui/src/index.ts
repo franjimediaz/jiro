@@ -8,6 +8,7 @@ export { default as CrearPresupuestoBtn } from "./components/CrearPresupuestoBtn
 export { default as DatosEmpresaCliente } from "./components/DatosEmpresaCliente";
 export { default as ArbolPresupuesto } from "./components/ArbolPresupuesto";
 export { default as TablaFractal } from "./components/TablaFractal";
+export { default as TreeViewServiciosTareas } from "./components/TreeViewServiciosTareas/TreeViewServiciosTareas";
 
 export { default as generarPDFPresupuesto } from "./components/utils/generarPDFPresupuesto";
 

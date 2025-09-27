@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import FormularioTabla from "../../components/FormularioTabla";
-import TreeViewServiciosTareas from "../../components/TreeViewServiciosTareas/TreeViewServiciosTareas";
+import {
+  FormularioTabla,
+  TablaListado,
+  TreeViewServiciosTareas,
+} from "@repo/ui";
 import CrearPresupuestoBtn from "../../components/CrearPresupuestoBtn";
-import type { Columna } from "../../components/TablaListado";
-import TablaListado from "../../components/TablaListado";
+import { Columna } from "@repo/shared/types";
 import { RequirePermiso, usePermisos } from "../../lib/permisos";
 
 type Presupuesto = {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import TablaListado from "../components/TablaListado";
+import { TablaListado } from "@repo/ui";
 import styles from "./Obras.module.css"; // o donde tengas el CSS
 import { useRouter } from "next/navigation";
 import { RequirePermiso, usePermisos } from "../lib/permisos";

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import FormularioTabla from "../../components/FormularioTabla";
-import TablaListado from "../../components/TablaListado";
+import { FormularioTabla, TablaListado } from "@repo/ui";
 import { RequirePermiso, usePermisos } from "../../lib/permisos";
 
 type UsuarioForm = {

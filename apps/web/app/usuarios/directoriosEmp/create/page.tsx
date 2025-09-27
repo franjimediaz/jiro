@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import FormularioTabla from "../../../components/FormularioTabla";
+import { FormularioTabla } from "@repo/ui";
 import { RequirePermiso } from "../../../lib/permisos";
 
 // Estructura del formulario por secciones

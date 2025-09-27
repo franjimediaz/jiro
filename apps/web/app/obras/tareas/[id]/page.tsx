@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import FormularioTabla from "../../../components/FormularioTabla";
-import TablaListado, { Columna } from "../../../components/TablaListado";
+import { FormularioTabla, TablaListado } from "@repo/ui";
+import { Columna } from "@repo/shared/types";
 import { RequirePermiso } from "../../../lib/permisos";
 
 type MaterialAsignado = {

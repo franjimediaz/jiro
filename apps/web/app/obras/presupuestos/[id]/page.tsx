@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import DatosEmpresaCliente from "../../../components/DatosEmpresaCliente";
-import FormularioTabla from "../../../components/FormularioTabla";
+import { FormularioTabla, TablaListado } from "@repo/ui";
 import ArbolPresupuesto from "../../../components/ArbolPresupuesto";
-import TablaListado from "../../../components/TablaListado";
-import type { Columna } from "../../../components/TablaListado";
+import { Columna } from "@repo/shared/types";
 import { RequirePermiso, usePermisos } from "../../../lib/permisos";
 
 type Presupuesto = {

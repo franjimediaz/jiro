@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import FormularioTabla from "../../../components/FormularioTabla";
+import { FormularioTabla } from "@repo/ui";
 import { RequirePermiso } from "../../../lib/permisos";
 
 const campos = [

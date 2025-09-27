@@ -118,6 +118,12 @@ export interface EmpresaBranding {
 export interface ArbolPresupuestoProps {
   presupuestoId: number;
 }
+export interface Columna {
+  clave: string;
+  encabezado: string;
+  tipo?: "texto" | "checkbox";
+  render?: (valor: any, fila: any) => React.ReactNode;
+}
 
 export const UNIDADES_MEDIDA = [
   { value: "kg", label: "Kilogramos" },

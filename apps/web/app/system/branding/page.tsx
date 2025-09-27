@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import FormularioTabla from "../../components/FormularioTabla";
+import { FormularioTabla } from "@repo/ui";
 import { RequirePermiso, usePermisos } from "../../lib/permisos";
 
 type BrandingValores = {

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import FormularioTabla from "../components/FormularioTabla";
+import { FormularioTabla } from "@repo/ui";
 
 type Perfil = {
   idUsuario: number;

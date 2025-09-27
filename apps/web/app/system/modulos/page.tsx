@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import TablaFractal from "../../components/TablaFractal";
+import { TablaFractal } from "@repo/ui";
 import { obtenerModulosJerarquicos } from "./modulosService";
 import BotonInicializarModulos from "./utils/BotonInicializarModulos";
 import { RequirePermiso, usePermisos } from "../../lib/permisos";

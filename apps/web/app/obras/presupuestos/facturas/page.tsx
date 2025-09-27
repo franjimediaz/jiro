@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import TablaListado from "../../../components/TablaListado";
+import { TablaListado } from "@repo/ui";
 import styles from "./Facturas.module.css";
-import type { Columna } from "../../../components/TablaListado";
+import { Columna } from "@repo/shared/types";
 import { useRouter } from "next/navigation";
 import { RequirePermiso, usePermisos } from "../../../lib/permisos";
 
