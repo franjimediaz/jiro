@@ -2,9 +2,10 @@ const express = require("express");
 const router = express.Router();
 const prisma = require("../lib/prisma");
 const bcrypt = require("bcrypt");
+app.set("trust proxy", 1);
 const jwt = require("jsonwebtoken");
 
-router.post("/", async (req, res) => {
+router.post("/dashboard", async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
