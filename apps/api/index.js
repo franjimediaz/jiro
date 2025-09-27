@@ -18,7 +18,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3002",
   "http://localhost:3001",
-  "http://dominio.com",
+  "https://jiro-web.vercel.app",
 ];
 function toNullableString(v) {
   if (v === undefined || v === null) return null;
