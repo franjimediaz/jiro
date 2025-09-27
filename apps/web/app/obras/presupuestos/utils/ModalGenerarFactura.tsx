@@ -1,4 +1,5 @@
-// components/ModalGenerarFactura.tsx
+// ModalGenerarFactura.tsx  (coloca este archivo en tu ruta real)
+// "use client" porque usa hooks y eventos
 "use client";
 
 import React, { useState } from "react";
@@ -6,27 +7,41 @@ import { useRouter } from "next/navigation";
 import styles from "./ModalGenerarFactura.module.css";
 import { usePermisos } from "../../../lib/permisos";
 
-interface Servicio {
-  id: number;
-  nombre: string;
-  total: number | null | undefined;
-}
+// Helpers para evitar renderizar bigint/objetos en JSX y para formato moneda
+const toDisplay = (v: unknown): string => {
+  if (v === null || v === undefined || v === "") return "-";
+  return typeof v === "bigint" ? v.toString() : String(v);
+};
 
-interface Props {
-  presupuestoId: number;
-  importePresupuesto: number;
+const toNumber = (v: unknown): number => {
+  const n = typeof v === "bigint" ? Number(v) : Number(v ?? 0);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const toCurrency = (v: unknown, currency: string = "EUR"): string =>
+  toNumber(v).toLocaleString("es-ES", { style: "currency", currency });
+
+type Servicio = {
+  id: number | string | bigint;
+  nombre: string;
+  total: number | string | bigint | null | undefined;
+};
+
+type Props = {
+  presupuestoId: number | string | bigint;
+  importePresupuesto: number | string | bigint;
   servicios: Servicio[];
   onClose: () => void;
   onFacturaCreada: (idFactura: number) => void;
-}
+};
 
-const ModalGenerarFactura: React.FC<Props> = ({
+export default function ModalGenerarFactura({
   presupuestoId,
   importePresupuesto,
   servicios,
   onClose,
   onFacturaCreada,
-}) => {
+}: Props) {
   const router = useRouter();
   const { can } = usePermisos();
 
@@ -46,18 +61,22 @@ const ModalGenerarFactura: React.FC<Props> = ({
     let serviciosIds: number[] = [];
 
     if (tipo === "porcentaje") {
-      const pct = isNaN(valor) ? 0 : Math.max(0, Math.min(100, valor));
-      cantidad = Number(((importePresupuesto || 0) * (pct / 100)).toFixed(2));
+      const base = toNumber(importePresupuesto);
+      const pct = Math.max(
+        0,
+        Math.min(100, Number.isFinite(valor) ? valor : 0)
+      );
+      cantidad = Math.round(base * (pct / 100) * 100) / 100;
     } else if (tipo === "importe") {
-      cantidad = Number((valor || 0).toFixed(2));
+      cantidad = Math.round(toNumber(valor) * 100) / 100;
     } else {
+      // Normalizamos IDs y sumamos totales de servicios marcados
       const seleccionados = servicios.filter((s) =>
-        serviciosSeleccionados.includes(s.id)
+        serviciosSeleccionados.includes(toNumber(s.id))
       );
-      cantidad = Number(
-        seleccionados.reduce((sum, s) => sum + (s.total ?? 0), 0).toFixed(2)
-      );
-      serviciosIds = seleccionados.map((s) => s.id);
+      const suma = seleccionados.reduce((sum, s) => sum + toNumber(s.total), 0);
+      cantidad = Math.round(suma * 100) / 100;
+      serviciosIds = seleccionados.map((s) => toNumber(s.id));
     }
 
     return { cantidad, serviciosIds };
@@ -83,7 +102,7 @@ const ModalGenerarFactura: React.FC<Props> = ({
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          presupuestoId,
+          presupuestoId: toNumber(presupuestoId), // 👈 evitamos BigInt en JSON
           cantidad,
           servicioIds: serviciosIds,
         }),
@@ -98,9 +117,9 @@ const ModalGenerarFactura: React.FC<Props> = ({
         return;
       }
 
-      const data = await res.json().catch(() => ({}) as any);
+      const data: any = await res.json().catch(() => ({}));
       if (res.ok && data?.id) {
-        onFacturaCreada(data.id);
+        onFacturaCreada(Number(data.id));
       } else {
         const msg =
           data?.message ||
@@ -148,7 +167,7 @@ const ModalGenerarFactura: React.FC<Props> = ({
               onChange={() => setTipo("importe")}
               disabled={!puedeCrear || enviando}
             />
-            Importe (€)
+            Importe ({toCurrency(importePresupuesto)})
           </label>
           <label>
             <input
@@ -190,27 +209,35 @@ const ModalGenerarFactura: React.FC<Props> = ({
 
         {tipo === "servicios" && (
           <div className={styles.listaServicios}>
-            {servicios.map((serv) => (
-              <label key={serv.id}>
-                <input
-                  type="checkbox"
-                  checked={serviciosSeleccionados.includes(serv.id)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setServiciosSeleccionados((prev) => [...prev, serv.id]);
-                    } else {
-                      setServiciosSeleccionados((prev) =>
-                        prev.filter((id) => id !== serv.id)
-                      );
-                    }
-                  }}
-                  disabled={!puedeCrear || enviando}
-                />
-                {serv.nombre} — {Number(serv.total ?? 0).toFixed(2)} €
-              </label>
-            ))}
+            {servicios.map((serv) => {
+              const idNum = toNumber(serv.id);
+              return (
+                <label key={`${idNum}-${toDisplay(serv.nombre)}`}>
+                  <input
+                    type="checkbox"
+                    checked={serviciosSeleccionados.includes(idNum)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setServiciosSeleccionados((prev) => [...prev, idNum]);
+                      } else {
+                        setServiciosSeleccionados((prev) =>
+                          prev.filter((id) => id !== idNum)
+                        );
+                      }
+                    }}
+                    disabled={!puedeCrear || enviando}
+                  />
+                  {toDisplay(serv.nombre)} — {toCurrency(serv.total)}
+                </label>
+              );
+            })}
           </div>
         )}
+
+        <div style={{ marginTop: "0.75rem", fontWeight: 600 }}>
+          Total a facturar:{" "}
+          <span>{toCurrency(calcularCantidad().cantidad)}</span>
+        </div>
 
         <div className={styles.acciones}>
           <button onClick={handleGenerar} disabled={!puedeCrear || enviando}>
@@ -223,6 +250,4 @@ const ModalGenerarFactura: React.FC<Props> = ({
       </div>
     </div>
   );
-};
-
-export default ModalGenerarFactura;
+}

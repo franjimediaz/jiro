@@ -4,7 +4,7 @@
   "scripts": {
     "build": "turbo run build --filter=web --filter=@repo/ui --filter=@repo/shared",
     "build:all": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=web --filter=api",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types"
@@ -23,7 +23,7 @@
   "engines": {
     "node": ">=18"
   },
-  "packageManager": "pnpm@10.9.2",
+  "packageManager": "npm@10.9.2",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -51,5 +51,9 @@
     "quill": "^2.0.3",
     "react-quill": "^2.0.0",
     "recharts": "^3.1.2"
+  },
+  "overrides": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   }
 }

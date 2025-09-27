@@ -25,10 +25,12 @@ type Seccion = {
 const RichTextEditor = dynamic(() => import("./utils/RichTextEditor"), {
   ssr: false,
 });
+
 type Columna = {
   clave: string;
   label: string;
 };
+
 export type Campo = {
   nombre: string;
   etiqueta: string;
@@ -65,7 +67,22 @@ type OpcionExtendida = {
   color?: string;
 };
 
-const FormularioTabla: React.FC<Props> = ({
+/** 🔒 Nunca renderizar bigints directamente en JSX */
+function toDisplay(v: unknown): string {
+  if (v === null || v === undefined) return "-";
+  if (typeof v === "bigint") return v.toString();
+  if (typeof v === "object") {
+    try {
+      // Si es un objeto simple: mostramos algo legible
+      return "toString" in (v as any) ? String(v as any) : JSON.stringify(v);
+    } catch {
+      return String(v);
+    }
+  }
+  return String(v);
+}
+
+export default function FormularioTabla({
   titulo,
   campos,
   secciones,
@@ -76,7 +93,7 @@ const FormularioTabla: React.FC<Props> = ({
   soloLectura = false,
   tabla,
   registroId,
-}) => {
+}: Props) {
   const router = useRouter();
   const [opcionesCampos, setOpcionesCampos] = useState<
     Record<string, OpcionExtendida[]>
@@ -86,13 +103,13 @@ const FormularioTabla: React.FC<Props> = ({
     Record<number, boolean>
   >({});
 
-  // ✅ Usar useMemo para evitar recalculación constante
+  // ✅ Evitar recalculación constante
   const seccionesAUsar = useMemo(() => {
     return secciones || (campos ? [{ titulo: "", campos }] : []);
   }, [secciones, campos]);
 
   useEffect(() => {
-    // Inicializar estado de expansión de secciones
+    // Inicializa expansión de secciones
     const estadoInicial: Record<number, boolean> = {};
     seccionesAUsar.forEach((seccion, index) => {
       if (seccion.expandible) {
@@ -107,9 +124,7 @@ const FormularioTabla: React.FC<Props> = ({
   useEffect(() => {
     const cargarOpciones = async () => {
       const nuevos: Record<string, OpcionExtendida[]> = {};
-
-      // Obtener todos los campos de todas las secciones
-      const todosCampos = seccionesAUsar.flatMap((seccion) => seccion.campos);
+      const todosCampos = seccionesAUsar.flatMap((s) => s.campos);
 
       for (const campo of todosCampos) {
         if (
@@ -140,28 +155,22 @@ const FormularioTabla: React.FC<Props> = ({
           }
         }
       }
-
       setOpcionesCampos(nuevos);
     };
 
-    // ✅ Solo cargar opciones si hay campos de selectorTabla
-    const tieneSelectoresTabla = seccionesAUsar.some((seccion) =>
-      seccion.campos.some(
-        (campo) =>
-          campo.tipo === "selectorTabla" && (soloLectura || campo.readOnly)
+    const tieneSelectoresTabla = seccionesAUsar.some((s) =>
+      s.campos.some(
+        (c) => c.tipo === "selectorTabla" && (soloLectura || c.readOnly)
       )
     );
 
     if (tieneSelectoresTabla) {
-      cargarOpciones();
+      void cargarOpciones();
     }
   }, [seccionesAUsar, soloLectura]);
 
   const toggleSeccion = (index: number) => {
-    setSeccionesExpandidas((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
+    setSeccionesExpandidas((prev) => ({ ...prev, [index]: !prev[index] }));
   };
 
   const subirArchivo = async (
@@ -185,7 +194,7 @@ const FormularioTabla: React.FC<Props> = ({
       if (data.fileUrl) {
         onChange?.(campo.nombre, data.fileUrl);
 
-        // 👇 Extra: guardar en base de datos si es campo de documento
+        // Guardar en BD si es documento
         if (campo.documento && tabla && registroId) {
           await fetch(`${process.env.NEXT_PUBLIC_API_URL}/documentos`, {
             method: "POST",
@@ -211,10 +220,29 @@ const FormularioTabla: React.FC<Props> = ({
     }
   };
 
+  const obtenerIconoLucide = (
+    nombreIcono: string,
+    nombreRegistro?: string,
+    color: string = "#000"
+  ) => {
+    const Icono = (LucideIcons as any)[nombreIcono];
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        {Icono ? (
+          <Icono size={24} color={color} />
+        ) : (
+          <LucideIcons.Circle size={24} color="#ccc" />
+        )}
+        <span style={{ color }}>{nombreRegistro || nombreIcono}</span>
+      </div>
+    );
+  };
+
   const renderValor = (campo: Campo, valor: any): React.ReactNode => {
-    if (!valor) return "-";
+    if (valor === null || valor === undefined || valor === "") return "-";
+
     if (campo.tipo === "archivo") {
-      const esImagen = /\.(png|jpg|jpeg|gif|webp)$/i.test(valor);
+      const esImagen = /\.(png|jpg|jpeg|gif|webp)$/i.test(String(valor));
 
       const eliminarArchivo = async () => {
         if (!valores[campo.nombre]) return;
@@ -230,28 +258,26 @@ const FormularioTabla: React.FC<Props> = ({
               credentials: "include",
             }
           );
-
           const data = await res.json();
           if (data.error) throw new Error(data.error);
-
-          // Vacía el valor del campo en el formulario
           onChange?.(campo.nombre, "");
         } catch (err) {
           console.error("Error al eliminar archivo:", err);
           alert("Error al eliminar archivo.");
         }
       };
+
       return (
         <div>
           {esImagen ? (
             <img
-              src={process.env.NEXT_PUBLIC_API_URL + valor}
+              src={process.env.NEXT_PUBLIC_API_URL + String(valor)}
               alt={campo.nombre}
               style={{ maxWidth: "150px", borderRadius: "6px" }}
             />
           ) : (
             <a
-              href={process.env.NEXT_PUBLIC_API_URL + valor}
+              href={process.env.NEXT_PUBLIC_API_URL + String(valor)}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -272,19 +298,20 @@ const FormularioTabla: React.FC<Props> = ({
     if (campo.tipo === "selectorTabla") {
       const opciones = opcionesCampos[campo.nombre] || [];
       const op = opciones.find((o) => String(o.value) === String(valor));
-      if (!op) return valor;
+      if (!op) return toDisplay(valor);
       if (op.icono && op.color) {
         return obtenerIconoLucide(op.icono, op.label, op.color);
       }
-      return op?.label || valor;
+      return op.label;
     }
+
     if (campo.tipo === "select" && campo.opciones) {
       const op = campo.opciones.find((o) => String(o.value) === String(valor));
-      return op?.label || valor;
+      return op?.label ?? toDisplay(valor);
     }
-    if (campo.tipo === "icono") {
-      return obtenerIconoLucide(valor, valor, "#000");
-    }
+
+    if (campo.tipo === "icono") return obtenerIconoLucide(valor, valor, "#000");
+
     if (campo.tipo === "color") {
       return (
         <div
@@ -292,91 +319,77 @@ const FormularioTabla: React.FC<Props> = ({
             display: "inline-block",
             width: "24px",
             height: "24px",
-            backgroundColor: valor,
+            backgroundColor: String(valor),
             border: "1px solid #ccc",
             borderRadius: "4px",
           }}
-          title={valor}
+          title={String(valor)}
         />
       );
     }
+
     if (campo.tipo === "richtext") {
       return (
         <div
           className={styles.vistaHTML}
-          dangerouslySetInnerHTML={{ __html: valor }}
+          dangerouslySetInnerHTML={{ __html: String(valor) }}
         />
       );
     }
+
     if (campo.tipo === "date" && valor) {
       const fecha = new Date(valor);
-      return fecha.toLocaleDateString("es-ES"); // dd/mm/yyyy
-    }
-    if (campo.tipo === "datetime-local" && valor) {
-      const fechaHora = new Date(valor);
-      return fechaHora.toLocaleString("es-ES"); // Formato legible con fecha y hora
-    }
-    if (campo.tipo === "number" && typeof valor === "number") {
-      return valor.toLocaleString("es-ES"); // Con separador de miles y decimales si aplica
-    }
-    if (campo.tipo === "password") {
-      return "******"; // o puedes usar 🔒 si prefieres
-    }
-    if (campo.tipo === "tags" && Array.isArray(valor)) {
-      return (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-          {valor.map((tag, i) => (
-            <span
-              key={i}
-              style={{
-                backgroundColor: "#eef",
-                padding: "0.2rem 0.6rem",
-                borderRadius: "12px",
-                fontSize: "0.85rem",
-              }}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      );
-    }
-    if (campo.tipo === "tags" && Array.isArray(valor)) {
-      return (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-          {valor.map((tag, i) => (
-            <span
-              key={i}
-              style={{
-                backgroundColor: "#eef",
-                padding: "0.2rem 0.6rem",
-                borderRadius: "12px",
-                fontSize: "0.85rem",
-              }}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      );
-    }
-    if (campo.tipo === "radio" && campo.opciones) {
-      const op = campo.opciones.find((o) => String(o.value) === String(valor));
-      return op?.label || valor;
-    }
-    if (campo.tipo === "slider") {
-      return `${valor} / 100`;
-    }
-    if (campo.tipo === "stepper") {
-      return valor ?? 0;
-    }
-    if (campo.tipo === "email") {
-      return <a href={`mailto:${valor}`}>{valor}</a>;
+      return fecha.toLocaleDateString("es-ES");
     }
 
-    if (campo.tipo === "tel") {
-      return <a href={`tel:${valor}`}>{valor}</a>;
+    if (campo.tipo === "datetime-local" && valor) {
+      const fechaHora = new Date(valor);
+      return fechaHora.toLocaleString("es-ES");
     }
+
+    if (campo.tipo === "number") {
+      const n = typeof valor === "bigint" ? Number(valor) : Number(valor);
+      if (Number.isNaN(n)) return toDisplay(valor);
+      return n.toLocaleString("es-ES");
+    }
+
+    if (campo.tipo === "password") return "******";
+
+    if (campo.tipo === "tags" && Array.isArray(valor)) {
+      return (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+          {valor.map((tag: unknown, i: number) => (
+            <span
+              key={i}
+              style={{
+                backgroundColor: "#eef",
+                padding: "0.2rem 0.6rem",
+                borderRadius: "12px",
+                fontSize: "0.85rem",
+              }}
+            >
+              {toDisplay(tag)}
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    if (campo.tipo === "radio" && campo.opciones) {
+      const op = campo.opciones.find((o) => String(o.value) === String(valor));
+      return op?.label ?? toDisplay(valor);
+    }
+
+    if (campo.tipo === "slider") return `${toDisplay(valor)} / 100`;
+
+    if (campo.tipo === "stepper") return toDisplay(valor ?? 0);
+
+    if (campo.tipo === "email")
+      return <a href={`mailto:${toDisplay(valor)}`}>{toDisplay(valor)}</a>;
+
+    if (campo.tipo === "tel")
+      return <a href={`tel:${toDisplay(valor)}`}>{toDisplay(valor)}</a>;
+
     if (campo.tipo === "subtabla" && Array.isArray(valor)) {
       return (
         <table className={styles.subtablaLectura}>
@@ -388,10 +401,10 @@ const FormularioTabla: React.FC<Props> = ({
             </tr>
           </thead>
           <tbody>
-            {valor.map((fila, i) => (
+            {valor.map((fila: any, i: number) => (
               <tr key={i}>
                 {(campo.columnas || []).map((col) => (
-                  <td key={col.clave}>{fila[col.clave]}</td>
+                  <td key={col.clave}>{toDisplay(fila?.[col.clave])}</td>
                 ))}
               </tr>
             ))}
@@ -400,35 +413,21 @@ const FormularioTabla: React.FC<Props> = ({
       );
     }
 
-    return valor.toString();
-  };
-
-  const obtenerIconoLucide = (
-    nombreIcono: string,
-    nombreRegistro?: string,
-    color: string = "#000"
-  ) => {
-    const Icono = (LucideIcons as any)[nombreIcono];
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        {Icono ? (
-          <Icono size={24} color={color} />
-        ) : (
-          <LucideIcons.Circle size={24} color="#ccc" />
-        )}
-        <span style={{ color }}>{nombreRegistro || nombreIcono}</span>
-      </div>
-    );
+    // Fallback seguro
+    return toDisplay(valor);
   };
 
   return (
     <div className={styles.formWrapper}>
       {titulo && <h2 className={styles.titulo}>{titulo}</h2>}
+
       {seccionesAUsar.map((seccion, seccionIndex) => (
         <div key={seccionIndex} className={styles.seccion}>
           {seccion.titulo && (
             <div
-              className={`${styles.seccionHeader} ${seccion.expandible ? styles.expandible : ""}`}
+              className={`${styles.seccionHeader} ${
+                seccion.expandible ? styles.expandible : ""
+              }`}
               onClick={
                 seccion.expandible
                   ? () => toggleSeccion(seccionIndex)
@@ -499,7 +498,10 @@ const FormularioTabla: React.FC<Props> = ({
                           >
                             <option value="">Selecciona una opción</option>
                             {campo.opciones?.map((op) => (
-                              <option key={op.value} value={op.value}>
+                              <option
+                                key={String(op.value)}
+                                value={op.value as any}
+                              >
                                 {op.label}
                               </option>
                             ))}
@@ -591,13 +593,13 @@ const FormularioTabla: React.FC<Props> = ({
                             {(valores[campo.nombre] || []).map(
                               (tag: string, index: number) => (
                                 <span key={index} className={styles.tag}>
-                                  {tag}
+                                  {toDisplay(tag)}
                                   <button
                                     type="button"
                                     onClick={() =>
                                       onChange?.(
                                         campo.nombre,
-                                        valores[campo.nombre].filter(
+                                        (valores[campo.nombre] || []).filter(
                                           (_: string, i: number) => i !== index
                                         )
                                       )
@@ -634,15 +636,16 @@ const FormularioTabla: React.FC<Props> = ({
                           <div className={styles.radioGroup}>
                             {campo.opciones?.map((opcion) => (
                               <label
-                                key={opcion.value}
+                                key={String(opcion.value)}
                                 className={styles.radioLabel}
                               >
                                 <input
                                   type="radio"
                                   name={campo.nombre}
-                                  value={opcion.value}
+                                  value={String(opcion.value)}
                                   checked={
-                                    valores[campo.nombre] === opcion.value
+                                    String(valores[campo.nombre]) ===
+                                    String(opcion.value)
                                   }
                                   onChange={() =>
                                     onChange?.(campo.nombre, opcion.value)
@@ -666,7 +669,7 @@ const FormularioTabla: React.FC<Props> = ({
                               className={styles.slider}
                             />
                             <span className={styles.sliderValor}>
-                              {valores[campo.nombre] || 0}
+                              {toDisplay(valores[campo.nombre] || 0)}
                             </span>
                           </div>
                         ) : campo.tipo === "stepper" ? (
@@ -761,9 +764,18 @@ const FormularioTabla: React.FC<Props> = ({
                         ) : campo.tipo === "number" ? (
                           <input
                             type="number"
-                            value={valores[campo.nombre] ?? ""}
+                            value={
+                              typeof valores[campo.nombre] === "bigint"
+                                ? Number(valores[campo.nombre])
+                                : (valores[campo.nombre] ?? "")
+                            }
                             onChange={(e) =>
-                              onChange?.(campo.nombre, e.target.valueAsNumber)
+                              onChange?.(
+                                campo.nombre,
+                                e.currentTarget.value === ""
+                                  ? ""
+                                  : e.currentTarget.valueAsNumber
+                              )
                             }
                             className={styles.input}
                           />
@@ -773,13 +785,18 @@ const FormularioTabla: React.FC<Props> = ({
                               type="file"
                               onChange={(e) => {
                                 const archivo = e.target.files?.[0];
-                                if (archivo)
-                                  subirArchivo(
+                                if (
+                                  archivo &&
+                                  tabla &&
+                                  typeof registroId === "number"
+                                ) {
+                                  void subirArchivo(
                                     archivo,
                                     campo,
-                                    tabla!,
-                                    registroId!
+                                    tabla,
+                                    registroId
                                   );
+                                }
                               }}
                               className={styles.inputArchivo}
                             />
@@ -815,6 +832,7 @@ const FormularioTabla: React.FC<Props> = ({
           )}
         </div>
       ))}
+
       {!soloLectura && (
         <div className={styles.botones}>
           {onSubmit && (
@@ -830,6 +848,4 @@ const FormularioTabla: React.FC<Props> = ({
       </button>
     </div>
   );
-};
-
-export default FormularioTabla;
+}
