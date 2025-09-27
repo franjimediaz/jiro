@@ -34,8 +34,10 @@ router.post("/", async (req, res) => {
     // ✅ Guardamos el token en una cookie HttpOnly
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // solo HTTPS en producción
-      sameSite: "strict",
+      secure: true,
+      //secure: process.env.NODE_ENV === "production", // solo HTTPS en producción
+      //sameSite: "strict",
+      sameSite: "none",
       maxAge: 24 * 60 * 60 * 1000, // 1 día
     });
 
