@@ -344,4 +344,12 @@ model Documento {
   registroId  Int
   creadoEn    DateTime @default(now())
 }
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl"]
+}
 
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
