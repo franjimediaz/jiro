@@ -1,0 +1,347 @@
+// ----------------------------------------------------Migraciones: npx prisma migrate dev
+// ---------------------------------------------------- Eliminar todo npx prisma migrate reset
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+// ------------------------------------------------------------------OBRAS -----------------------------------------------------------------------
+model Obra {
+  id             Int               @id @default(autoincrement())
+  nombre         String
+  descripcion    String? // opcional
+  direccion      String
+  fechaInicio    DateTime
+  fechaFin       DateTime
+  estadoId       Int?
+  estado         Estados?          @relation(fields: [estadoId], references: [id])
+  createdAt      DateTime          @default(now())
+  clienteId      Int
+  cliente        Cliente           @relation(fields: [clienteId], references: [id])
+  serviciosTarea Servicios_Tarea[]
+  Presupuestos Presupuesto[]
+}
+
+model Cliente {
+  id        Int    @id @default(autoincrement())
+  nombre    String
+  apellido  String
+  dni       String?
+  direccion String
+  email     String
+  telefono  String
+  obras     Obra[]
+  Presupuestos Presupuesto[]
+}
+//-----------------------------------------------------Usuario
+model Usuario {
+  id       Int               @id @default(autoincrement())
+  idUsuario String        @unique
+  nombre   String
+  apellido String
+  email    String         @unique
+  passwordHash String
+  telefono String?
+  tareas   Servicios_Tarea[]     @relation("UsuarioTareas")
+  rolId        Int?   
+  rol          Rol?      @relation(fields: [rolId], references: [id], onDelete: SetNull)    
+  activo   Boolean @default(true)
+  directorio   Directorios?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt      @map("updated_at")
+}
+
+
+model Directorios {
+  id                      Int         @id @default(autoincrement())
+  tipo                    String?
+  estado                  Boolean?
+
+  nombre                  String
+  apellidos               String
+  displayName             String?
+  dni                     String?        @unique
+  email                   String         @unique
+  emailPersonal           String?
+  telefono                String?
+  telefono2               String?
+  fotoUrl                 String?
+
+  puesto                  String?
+  departamentoId          String?
+  departamento            Departamento?  @relation(fields: [departamentoId], references: [id])
+
+  /// 🧭 Self-relation: un directorio puede tener un supervisor y muchos subordinados
+  supervisorId            Int?
+  supervisor              Directorios?   @relation("SupervisorSubordinado", fields: [supervisorId], references: [id])
+  subordinados            Directorios[]  @relation("SupervisorSubordinado")
+
+  rol                     String?
+  jornada                 String?
+  turno                   String?
+
+  empresaExternaId        String?
+  empresaExterna          EmpresaExterna? @relation(fields: [empresaExternaId], references: [id])
+
+  /// 🔗 Relación 1:1 con Usuario (Usuario.id es Int → este campo también Int)
+  usuarioId               Int?           @unique
+  usuario                 Usuario?       @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  calendarEmail           String?
+
+  costeHora               Decimal?       @db.Decimal(12,2)
+  tarifaFacturacionHora   Decimal?       @db.Decimal(12,2)
+  moneda                  String?        @default("EUR")
+  capacidadSemanalHoras   Int?
+
+  tienePRL                Boolean        @default(false)
+  prlVencimiento          DateTime?
+  rcVigente               Boolean        @default(false)
+  rcVencimiento           DateTime?
+
+  ubicacionCiudad         String?
+  ubicacionProvincia      String?
+  ubicacionPais           String?
+
+  fechaAlta               DateTime       @default(now())
+  fechaBaja               DateTime?
+  observaciones           String?
+  tags                    String[]       @db.Text
+
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  @@index([tipo, estado])
+  @@index([departamentoId])
+  @@index([empresaExternaId])
+}
+
+model Departamento {
+  id        String     @id @default(cuid())
+  nombre    String     @unique
+  directorios Directorios[]
+}
+
+model EmpresaExterna {
+  id        String     @id @default(cuid())
+  nombre    String
+  cif       String?
+  email     String?
+  telefono  String?
+  direccion String?
+  directorios Directorios[]
+}
+
+//----------------------------------------------------
+model Tareas {
+  id             Int               @id @default(autoincrement())
+  nombre         String
+  descripcion    String
+  progreso       Int?
+  estadoId       Int?
+  direccion     String?
+  estado         Estados?          @relation(fields: [estadoId], references: [id])
+  serviciosTarea Servicios_Tarea?  @relation("RelacionTarea")
+}
+
+model Servicios {
+  id             Int               @id @default(autoincrement())
+  nombre         String
+  color          String
+  icono          String
+  serviciosTarea Servicios_Tarea[]
+}
+
+
+model Materiales {
+  id             Int               @id @default(autoincrement())
+  nombre         String
+  descripcion    String
+  precio         Int
+  proveedor      String
+  stockActual Int?
+  unidadMedida String? // Ej: kg, m2, litros
+  serviciosTarea Servicios_Tarea[]
+  st_material ST_Material[]
+}
+
+model ST_Material{
+  id             Int               @id @default(autoincrement())
+  ServicioTareaId  Int       
+  materialesId      Int
+  cantidad         Int
+  preciounidad     Int
+  total            Int
+  facturable      Boolean @default(false)
+  material          Materiales? @relation(fields: [materialesId], references: [id])
+  servicioTarea     Servicios_Tarea  @relation(fields: [ServicioTareaId], references: [id])
+}
+model Facturas {
+  id             Int               @id @default(autoincrement())
+  numero         String?           
+  descripcion    String?           
+  referencia     String
+  fecha          DateTime
+  importe        Float?            
+  estado         String            @default("pendiente") 
+  cobrada        Boolean           @default(false)
+  cantidad       Int?
+  presupuestoId  Int
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  
+
+  presupuesto    Presupuesto       @relation(fields: [presupuestoId], references: [id])
+  
+}
+
+model Presupuesto{
+  id             Int               @id @default(autoincrement())
+  nombre        String
+  descripcion   String
+  createdAt     DateTime          @default(now())
+  aceptado      Boolean @default(false)
+  importe       Float     @default(0)
+  ivaPorcentaje   Float     @default(21)
+  descuentoTipo   String    @default("porcentaje") // "porcentaje" o "valor"
+  descuentoValor  Float     @default(0)
+  clienteId     Int
+  Cliente       Cliente?    @relation(fields: [clienteId], references: [id])
+  obraId        Int
+  obra       Obra?         @relation(fields: [obraId], references: [id])
+  servicios      Presupuesto_Servicio[]
+  facturas      Facturas[]
+  condiciones  String?
+}
+model Presupuesto_Tarea {
+  id                      Int    @id @default(autoincrement())
+  nombre                  String
+  descripcion             String
+  presupuestoServicioId   Int
+  tareaId                 Int?
+  precioManoObra          Int?
+  total                   Int?
+  cantidad                Int?
+  totalMateriales         Int?
+  presupuestoServicio     Presupuesto_Servicio @relation(fields: [presupuestoServicioId], references: [id])
+  materiales              Presupuesto_Material[]
+}
+model Presupuesto_Material {
+  id                 Int    @id @default(autoincrement())
+  presupuestoTareaId Int
+  nombre             String
+  cantidad           Int
+  precioUnidad       Int
+  total              Int
+  facturable        Boolean
+
+  presupuestoTarea Presupuesto_Tarea @relation(fields: [presupuestoTareaId], references: [id])
+}
+
+
+model Presupuesto_Servicio {
+  id             Int      @id @default(autoincrement())
+  nombre         String
+  presupuestoId  Int
+  servicioId     Int
+  presupuesto    Presupuesto @relation(fields: [presupuestoId], references: [id])
+  tareas         Presupuesto_Tarea[]
+}
+
+
+model Servicios_Tarea {
+  id                 Int        @id @default(autoincrement())
+  obraId            Int
+  servicioId        Int
+  tareaId           Int?         @unique                // Puede no haber tarea asociada aún
+  materialesId      Int?                        // Material opcional
+  stMateriales      ST_Material[]
+  usuarioId         Int?                    
+  fechaInicio       DateTime?                    // Opcional
+  fechaFin          DateTime?                    // Opcional
+  precioManoObra    Float?                       // Opcional
+  cantidadMateriales Float?                      // Opcional
+  precioMateriales  Float?                       // Opcional
+  total             Float? 
+  costeResponsable  Json? 
+
+  obra              Obra       @relation(fields: [obraId], references: [id])
+  servicio          Servicios   @relation(fields: [servicioId], references: [id])
+  material          Materiales? @relation(fields: [materialesId], references: [id])
+  tarea             Tareas?     @relation("RelacionTarea", fields: [tareaId], references: [id])
+  usuario           Usuario? @relation("UsuarioTareas", fields: [usuarioId], references: [id])
+  
+  
+
+@@map("Servicios_Tarea") // Opcional: si usas nombre exacto en la base de datos
+}
+
+// ------------------------------------------------------------------Otros -----------------------------------------------------------------------
+model Branding {
+  id            Int     @id @default(autoincrement())
+  nombre        String  // nombre fiscal de la empresa
+  CIF           String
+  direccion     String
+  codigoPostal  String
+  localidad     String
+  provincia     String
+  telefono      String
+  email         String
+  web           String?
+  logoUrl       String? 
+  colorGeneral  String?
+  colorPDF  String?
+  CondicionesPresupuesto  String?
+  firma         String?
+
+}
+
+model Rol {
+  id          Int     @id @default(autoincrement())
+  nombre      String   @unique @db.VarChar(50)
+  descripcion String?  @db.Text
+  nivel       Int      @default(5)
+  activo      Boolean  @default(true)
+  usuarios    Usuario[]
+  permisos    Json     @default("{}") // JSONB en PostgreSQL
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+}
+model Modulo {
+  id          Int       @id @default(autoincrement())
+  nombre      String
+  icono       String?
+  activo      Boolean?
+  ruta        String?
+  orden       Int?
+  padreId     Int?                     // Clave foránea
+  padre       Modulo?   @relation("ModuloJerarquia", fields: [padreId], references: [id])
+  hijos       Modulo[]  @relation("ModuloJerarquia") // Relación inversa
+}
+model Estados {
+  id             Int               @id @default(autoincrement())
+  nombre         String
+  color          String
+  icono          String
+  obra           Obra[]
+  tarea          Tareas[]
+
+  
+}
+
+model Documento {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  url         String
+  tipo        String
+  tabla       String   // ejemplo: "obras", "clientes"
+  registroId  Int
+  creadoEn    DateTime @default(now())
+}
+
