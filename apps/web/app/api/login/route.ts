@@ -1,115 +1,95 @@
-import { NextResponse } from "next/server";
-import * as bcrypt from "bcryptjs";
-import * as jwt from "jsonwebtoken";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
-type LoginBody = { email?: unknown; password?: unknown };
+// Utilidad: decidir si un error es "de DB" o no
+function esErrorDeBD(e: any): boolean {
+  const code = e?.code ?? "";
+  const name = e?.name ?? "";
+  const msg = (e?.message ?? "").toLowerCase();
 
-export async function POST(req: Request) {
+  // Errores típicos Prisma/DB en serverless
+  if (code.startsWith("P10")) return true; // P1000, P1001, etc.
+  if (name.includes("PrismaClientInitializationError")) return true;
+  if (msg.includes("connect") || msg.includes("timeout")) return true;
+  if (msg.includes("certificate") || msg.includes("ssl")) return true;
+  return false;
+}
+
+export async function POST(req: NextRequest) {
   try {
-    // 0) LOG ENV BÁSICO (no logueamos secretos, solo si hay o no)
-    const hasDB = !!process.env.DATABASE_URL;
-    const hasJWT = !!process.env.JWT_SECRET;
-    console.log("[/api/login] env", { hasDB, hasJWT });
+    // 1) Pre-chequeo de config
+    if (!process.env.JWT_SECRET) {
+      return NextResponse.json(
+        { error: "CONFIG_FALTANTE", detalle: "JWT_SECRET no definido" },
+        { status: 500 }
+      );
+    }
 
-    // 1) Leer body y validar
-    const body: LoginBody = await req.json().catch((e) => {
-      console.error("[/api/login] JSON parse error:", e);
-      throw new Error("BODY_INVALIDO");
-    });
-    const email = typeof body.email === "string" ? body.email.trim() : "";
-    const password = typeof body.password === "string" ? body.password : "";
+    // 2) Body y validación mínima
+    const body = await req.json().catch(() => ({}));
+    const email: string = body?.email?.toString().trim() ?? "";
+    const password: string = body?.password?.toString() ?? "";
+
     if (!email || !password) {
       return NextResponse.json(
-        { error: "Email y contraseña obligatorios" },
+        {
+          error: "DATOS_INVALIDOS",
+          detalle: "email y password son requeridos",
+        },
         { status: 400 }
       );
     }
 
-    // 2) Comprobar conexión DB con una consulta trivial
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-    } catch (e) {
-      console.error("[/api/login] DB connection error:", e);
-      return NextResponse.json({ error: "DB_NO_DISPONIBLE" }, { status: 500 });
-    }
-
     // 3) Buscar usuario
-    const usuario = await prisma.usuario.findUnique({
-      where: { email },
-      include: { rol: true },
-    });
-
-    if (!usuario || !usuario.activo) {
+    const user = await prisma.usuario.findUnique({ where: { email } });
+    if (!user) {
       return NextResponse.json(
-        { error: "Usuario no encontrado o inactivo" },
+        { error: "CREDENCIALES_INVALIDAS" },
         { status: 401 }
       );
     }
 
-    if (!usuario.passwordHash) {
-      console.error("[/api/login] Usuario sin passwordHash", {
-        id: usuario.id,
-        email: usuario.email,
-      });
-      return NextResponse.json(
-        { error: "Credenciales incorrectas" },
-        { status: 401 }
-      );
-    }
-
-    // 4) Comparar contraseña
-    const ok = await bcrypt.compare(password, usuario.passwordHash);
+    // 4) Comparar password
+    const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
       return NextResponse.json(
-        { error: "Contraseña incorrecta" },
+        { error: "CREDENCIALES_INVALIDAS" },
         { status: 401 }
       );
     }
 
-    // 5) Firmar JWT (si no hay JWT_SECRET, usamos fallback pero lo LOGUEAMOS)
-    const secret = process.env.JWT_SECRET || "cambia-esto-en-vercel";
-    if (!process.env.JWT_SECRET) {
-      console.warn(
-        "[/api/login] WARNING: usando JWT_SECRET de fallback, configura JWT_SECRET en Vercel"
-      );
-    }
-
+    // 5) Firmar token
     const token = jwt.sign(
-      { id: usuario.id, rolId: usuario.rolId, rolNombre: usuario.rol?.nombre },
-      secret,
-      { expiresIn: "1d" }
+      { id: user.id, rolId: user.rolId },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "2h" }
     );
 
-    // 6) Responder + cookie
-    const res = NextResponse.json({
-      usuario: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        email: usuario.email,
-        rolId: usuario.rolId,
-        rolNombre: usuario.rol?.nombre,
-      },
-    });
-
-    res.cookies.set("token", token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24,
-    });
-
+    // (Opcional) Set cookie httpOnly. Si no usas cookie, devuelve el token en el body.
+    const res = NextResponse.json({ ok: true, token });
+    // res.cookies.set("auth", token, {
+    //   httpOnly: true, secure: true, sameSite: "strict", path: "/", maxAge: 60 * 60 * 2
+    // });
     return res;
-  } catch (err: any) {
-    console.error("❌ [/api/login] ERROR:", err?.message, err?.stack);
-    // TEMPORAL: expón el mensaje para ver el fallo durante diagnóstico
+  } catch (e: any) {
+    // Mapeo fino: solo DB → DB_NO_DISPONIBLE; el resto, error real
+    if (esErrorDeBD(e)) {
+      return NextResponse.json(
+        {
+          error: "DB_NO_DISPONIBLE",
+          code: e?.code ?? "",
+          msg: e?.message ?? "",
+        },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
-      { error: err?.message || "Error interno" },
+      { error: "ERROR_LOGIN", code: e?.code ?? "", msg: e?.message ?? "" },
       { status: 500 }
     );
   }
