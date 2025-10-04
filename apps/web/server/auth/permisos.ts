@@ -7,7 +7,7 @@ export async function loadPermisosMapa(userId: number): Promise<PermisosMapa> {
   const usuario = await prisma.usuario.findUnique({
     where: { id: userId },
     include: {
-      roles: {
+      rol: {
         include: {
           permisos: true, // asumiendo Role { permisos: RolePermiso[] }
         },
