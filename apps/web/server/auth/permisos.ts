@@ -13,10 +13,7 @@ export type PermisosMapa = Record<string, Record<string, boolean>>;
  * - Tabla role_permisos -> (modulo, accion)
  */
 export async function loadPermisosMapa(userId: number): Promise<PermisosMapa> {
-  // ⚠️ DEMO: intenta deducir la estructura típica
   // usuario -> rol -> role_permisos(modulo, accion)
-
-  // 1) Rol(es) del usuario
   const usuario = await prisma.usuario.findUnique({
     where: { id: userId },
     include: {
@@ -30,10 +27,7 @@ export async function loadPermisosMapa(userId: number): Promise<PermisosMapa> {
 
   const mapa: PermisosMapa = {};
 
-  // Si no tienes ese modelo, cambia esta parte a tu realidad:
-  if (!usuario?.roles?.length) {
-    return mapa;
-  }
+  if (!usuario?.roles?.length) return mapa;
 
   for (const rol of usuario.roles) {
     for (const rp of rol.permisos || []) {
@@ -50,16 +44,21 @@ export async function loadPermisosMapa(userId: number): Promise<PermisosMapa> {
     }
   }
 
-  // Opcional: comodines (*) → expandir
-  // p. ej. si guardas 'ver'/'crear'... bajo accion='*'
-  Object.keys(mapa).forEach((mod) => {
-    if (mapa[mod]["*"]) {
-      mapa[mod]["ver"] = true;
-      mapa[mod]["crear"] = true;
-      mapa[mod]["actualizar"] = true;
-      mapa[mod]["eliminar"] = true;
+  // ✅ Comodines (*) → expandir de forma segura y sin warnings
+  const ACCIONES = ["ver", "crear", "actualizar", "eliminar"] as const;
+
+  for (const mod of Object.keys(mapa)) {
+    // Asegura que el objeto existe y permite leer "*"
+    const modPerms = (mapa[mod] ??= {});
+    const modPermsAny = modPerms as Record<string, boolean>;
+
+    if (modPermsAny["*"]) {
+      ACCIONES.forEach((accion) => {
+        modPerms[accion] = true;
+      });
+      delete modPermsAny["*"]; // Limpieza opcional
     }
-  });
+  }
 
   return mapa;
 }
