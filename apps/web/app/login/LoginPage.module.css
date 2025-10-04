@@ -133,106 +133,58 @@
 .forgotPassword a:hover {
   text-decoration: underline;
 }
-@media (max-width: 1280px) {
-  .sidebar {
-    max-width: 380px; /* sidebar un poco más estrecha */
-  }
-}
-
-/* ====== Tablet ≤ 1024px ====== */
-@media (max-width: 1024px) {
-  .container {
-    /* Mantén tu imagen pero facilita el reflow */
-    background-position: center top;
-    padding: 0; /* evita desplazamientos laterales */
-  }
-
-  .sidebar {
-    height: auto; /* ya no fuerza 100vh en tablet */
-    padding: 2rem 1.5rem;
-    box-shadow: none; /* más plano para pantallas medianas */
-    max-width: none; /* usa todo el ancho disponible */
-  }
-
-  .overlay {
-    max-width: 560px; /* permite un formulario más ancho si hay espacio */
-  }
-
-  .fondo {
-    padding: 2rem 1.25rem 3rem;
-    background-position: center;
-  }
-}
-
-/* ====== Móvil ≤ 768px ====== */
 @media (max-width: 768px) {
   .container {
-    flex-direction: column-reverse; /* Sidebar abajo (como ya tenías) */
-  }
-
-  /* OJO: mantengo tu clase exacta .contenidoLogin 
-     (no toco nombres). Añadimos ajuste responsivo. */
-  .contenidoLogin {
-    width: 100%;
-    max-width: none;
-    height: auto;
-    box-shadow: none; /* reduce sombra para look más ligero en móvil */
-    padding: 1.25rem;
-    border-radius: 12px;
+    flex-direction: column; /* apila verticalmente */
+    justify-content: center; /* centra verticalmente */
+    align-items: center; /* centra horizontalmente */
+    padding: 1.5rem;
   }
 
   .sidebar {
-    width: 100%;
-    max-width: none;
-    height: auto;
-    box-shadow: none;
-    padding: 1.5rem 1rem 2rem;
-    backdrop-filter: none; /* evita blur pesado en móviles */
-    -webkit-backdrop-filter: none;
-    background-color: rgba(0, 0, 0, 0.35); /* mantiene legibilidad */
+    display: none; /* oculta sidebar en móvil */
   }
 
-  .overlay {
+  .contenidoLogin {
     width: 100%;
-    max-width: 520px;
-    padding: 1.5rem;
-    border-radius: 14px;
+    max-width: 400px;
+    background-color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    border-radius: 16px;
+    padding: 2rem;
     margin: 0 auto;
   }
 
-  .title {
-    font-size: clamp(1.25rem, 1rem + 1.5vw, 1.6rem);
-  }
-}
-
-/* ====== Móvil pequeño ≤ 480px ====== */
-@media (max-width: 480px) {
   .overlay {
-    padding: 1rem;
-    border-radius: 12px;
+    background: transparent; /* evita doble fondo */
+    box-shadow: none;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 
-  .input {
-    font-size: 0.95rem;
-    padding: 0.7rem 0.8rem;
+  .title {
+    text-align: center;
+    font-size: 1.5rem;
   }
 
   .button {
-    padding: 0.75rem;
-    font-size: 0.95rem;
+    font-size: 1rem;
+    padding: 0.85rem;
     border-radius: 10px;
   }
 
-  .forgotPassword {
-    font-size: 0.9rem;
+  .fondo {
+    background-position: center;
+    background-size: cover;
   }
 }
 
-/* ====== Soporte progresivo: si no hay blur, usa color más sólido ====== */
-@supports not (
-  (backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))
-) {
-  .sidebar {
-    background-color: rgba(3, 31, 121, 0.7);
+/* Extra: móvil pequeño */
+@media (max-width: 480px) {
+  .contenidoLogin {
+    padding: 1.5rem;
+    max-width: 90%;
   }
 }
