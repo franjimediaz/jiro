@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { TablaListado } from "@repo/ui";
-import styles from "./Obras.module.css"; // o donde tengas el CSS
+import styles from "./Obras.module.css";
 import { useRouter } from "next/navigation";
 import { RequirePermiso, usePermisos } from "../lib/permisos";
 
@@ -20,10 +20,10 @@ export default function ObrasPage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // ⬇️ Cargamos permisos desde el provider
+  // ⬇ Cargamos permisos desde el provider
   const { loading: permisosLoading, can } = usePermisos();
 
-  // ⬇️ Traer datos SOLO si tiene permiso de 'ver'
+  // ⬇ Traer datos SOLO si tiene permiso de 'ver'
   useEffect(() => {
     if (permisosLoading) return; // espera a que carguen permisos
 
@@ -98,7 +98,7 @@ export default function ObrasPage() {
     },
   ];
 
-  // ⬇️ Si no hay permiso de exportar, pasamos un array vacío para no mostrar export (si tu tabla lo soporta así)
+  // ⬇ Si no hay permiso de exportar, pasamos un array vacío para no mostrar export (si tu tabla lo soporta así)
   const exportColumns = can("obras", "exportar") ? exportC : [];
 
   return (
