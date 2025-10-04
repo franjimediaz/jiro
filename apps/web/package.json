@@ -12,10 +12,11 @@
     "generate": "prisma generate",
     "start": "next start",
     "lint": "next lint --max-warnings 0",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@prisma/client": "^5.19.1",
+    "@prisma/client": "^6.16.3",
     "@repo/shared": "*",
     "@repo/ui": "*",
     "bcryptjs": "^2.4.3",
@@ -38,7 +39,7 @@
     "css-loader": "^6.11.0",
     "eslint": "^9.28.0",
     "postcss-loader": "^7.3.4",
-    "prisma": "^5.22.0",
+    "prisma": "^6.16.3",
     "style-loader": "^3.3.4",
     "typescript": "5.8.2"
   }
