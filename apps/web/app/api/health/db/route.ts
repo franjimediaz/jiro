@@ -6,7 +6,6 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    // consulta trivial
     await prisma.$queryRaw`SELECT 1`;
     return NextResponse.json({ ok: true });
   } catch (e: any) {
