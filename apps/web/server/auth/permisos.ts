@@ -1,17 +1,7 @@
-// apps/web/server/auth/permisos.ts
 import { prisma } from "@/lib/prisma";
 
-// Estructura que espera tu <PermisosProvider/>
 export type PermisosMapa = Record<string, Record<string, boolean>>;
 
-/**
- * Obtiene permisos "normalizados" por { [modulo]: { [accion]: boolean } }
- * a partir de tu modelo en PostgreSQL vía Prisma.
- *
- * Ajusta las consultas a tu esquema real:
- * - Tabla usuarios -> roles
- * - Tabla role_permisos -> (modulo, accion)
- */
 export async function loadPermisosMapa(userId: number): Promise<PermisosMapa> {
   // usuario -> rol -> role_permisos(modulo, accion)
   const usuario = await prisma.usuario.findUnique({
@@ -44,11 +34,9 @@ export async function loadPermisosMapa(userId: number): Promise<PermisosMapa> {
     }
   }
 
-  // ✅ Comodines (*) → expandir de forma segura y sin warnings
   const ACCIONES = ["ver", "crear", "actualizar", "eliminar"] as const;
 
   for (const mod of Object.keys(mapa)) {
-    // Asegura que el objeto existe y permite leer "*"
     const modPerms = (mapa[mod] ??= {});
     const modPermsAny = modPerms as Record<string, boolean>;
 
@@ -56,7 +44,7 @@ export async function loadPermisosMapa(userId: number): Promise<PermisosMapa> {
       ACCIONES.forEach((accion) => {
         modPerms[accion] = true;
       });
-      delete modPermsAny["*"]; // Limpieza opcional
+      delete modPermsAny["*"];
     }
   }
 
