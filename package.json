@@ -21,7 +21,7 @@
     "typescript": "5.8.2"
   },
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "packageManager": "npm@10.9.2",
   "workspaces": [
@@ -29,6 +29,7 @@
     "packages/*"
   ],
   "dependencies": {
+    "@prisma/client": "^6.16.2",
     "@repo/shared": "*",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.58.0",

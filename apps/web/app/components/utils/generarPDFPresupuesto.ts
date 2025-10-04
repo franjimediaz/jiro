@@ -1,30 +1,70 @@
+// apps/web/app/obras/presupuestos/utils/pdf/generarPDFPresupuesto.ts
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import html2canvas from "html2canvas";
+import autoTable, { RowInput } from "jspdf-autotable";
 import {
   ServicioPresupuesto,
   EmpresaInfo,
   ClienteInfo,
 } from "../../../types/presupuesto";
 
+/** ========= THEME / ESTILO ========= */
+const THEME = {
+  margins: { left: 20, right: 20, top: 24, bottom: 22 },
+  brand: {
+    primary: [15, 23, 42] as [number, number, number], // azul marino
+    text: [17, 24, 39] as [number, number, number], // casi negro
+    muted: [107, 114, 128] as [number, number, number], // gris medio
+    border: [225, 229, 234] as [number, number, number], // gris sutil
+    soft: [246, 248, 251] as [number, number, number],
+    white: [255, 255, 255] as [number, number, number], // fondo blanco
+  },
+  fonts: {
+    base: "helvetica",
+    sizes: { xs: 8, sm: 9, base: 10, md: 11, lg: 13, xl: 16, xxl: 20 },
+  },
+};
+
+/** ========= UTILS ========= */
+const euro = new Intl.NumberFormat("es-ES", {
+  style: "currency",
+  currency: "EUR",
+  minimumFractionDigits: 2,
+});
+const fmt = (n?: number | null) => euro.format(Number(n || 0));
+
 async function urlToBase64(url: string): Promise<string> {
   const response = await fetch(url);
   const blob = await response.blob();
-
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-      } else {
-        reject("Error al convertir imagen a base64");
-      }
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject("Error al convertir imagen a base64");
     };
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
 }
 
+/** Dibuja una línea inferior de toda la fila si existen 1ª y última celda */
+function drawRowBottomLine(
+  doc: jsPDF,
+  row: any,
+  table: any,
+  yLine: number,
+  color: [number, number, number],
+  width = 0.2
+) {
+  const firstCell = row?.cells?.[0];
+  const lastCell = row?.cells?.[table?.columns?.length - 1];
+  if (!firstCell || !lastCell) return;
+
+  doc.setDrawColor(...color);
+  doc.setLineWidth(width);
+  doc.line(firstCell.x, yLine, lastCell.x + lastCell.width, yLine);
+}
+
+/** ========= GENERADOR PRINCIPAL ========= */
 export async function generarPDFPresupuesto(
   estructura: ServicioPresupuesto[],
   ivaPorcentaje: number,
@@ -35,325 +75,504 @@ export async function generarPDFPresupuesto(
   nombrePresupuesto: string,
   condiciones: string
 ) {
-  const doc = new jsPDF();
+  // Unidad mm para mantener proporciones
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  if (empresa.logoUrl) {
-    try {
-      const logoUrlCompleta = empresa.logoUrl.startsWith("http")
-        ? empresa.logoUrl
-        : `${process.env.NEXT_PUBLIC_API_URL}${empresa.logoUrl}`;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const M = THEME.margins;
+  const B = THEME.brand;
 
-      const base64Logo = await urlToBase64(logoUrlCompleta);
-      doc.addImage(base64Logo, "PNG", 14, 10, 40, 15); // Ajusta tamaño y posición
-    } catch (error) {
-      console.error("Error al cargar el logo:", error);
-    }
-  }
+  // Logo y firma (si existen)
+  let logoBase64: string | null = null;
   let firmaBase64: string | null = null;
 
+  if (empresa.logoUrl) {
+    try {
+      const url = empresa.logoUrl.startsWith("http")
+        ? empresa.logoUrl
+        : `${process.env.NEXT_PUBLIC_API_URL}${empresa.logoUrl}`;
+      logoBase64 = await urlToBase64(url);
+    } catch {
+      /* noop */
+    }
+  }
   if (empresa.firma) {
     try {
-      const firmaUrlCompleta = empresa.firma.startsWith("http")
+      const url = empresa.firma.startsWith("http")
         ? empresa.firma
         : `${process.env.NEXT_PUBLIC_API_URL}${empresa.firma}`;
-
-      firmaBase64 = await urlToBase64(firmaUrlCompleta);
-    } catch (error) {
-      console.error("Error al cargar la firma:", error);
+      firmaBase64 = await urlToBase64(url);
+    } catch {
+      /* noop */
     }
   }
 
-  const colorTabla: [number, number, number] = [200, 200, 255];
-  const leftX = 14;
-  const startY = 20;
+  // ====== CABECERA ELEGANTE ======
+  doc.setFillColor(...B.primary);
+  doc.rect(0, 0, pageWidth, 20, "F");
 
-  // Título
-  doc.setFontSize(16);
-  doc.setFont("helvetica", "bold");
-  doc.text(nombrePresupuesto, pageWidth / 2, startY, { align: "center" });
-  doc.line(14, startY + 2, pageWidth - 14, startY + 2);
+  const numeroPresupuesto = `Nº ${String(Math.floor(Math.random() * 100000)).padStart(5, "0")}`;
 
-  // Datos de empresa y cliente
-  const bloqueY = startY + 12;
-  const tarjetaAltura = 42;
-  const tarjetaAncho = (pageWidth - 40) / 2;
-  const tarjetaPadding = 4;
+  if (logoBase64) {
+    doc.addImage(logoBase64, "PNG", M.left, 3, 24, 6);
+  }
+  doc.setFont(THEME.fonts.base, "bold");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(THEME.fonts.sizes.lg);
+  doc.text("PRESUPUESTO", pageWidth - M.right, 6.4, {
+    align: "right",
+    baseline: "middle",
+  });
+  doc.setFont(THEME.fonts.base, "normal");
+  doc.setFontSize(THEME.fonts.sizes.md);
+  doc.text(numeroPresupuesto, pageWidth - M.right, 10.2, {
+    align: "right",
+    baseline: "middle",
+  });
 
-  const colorFondo: [number, number, number] = [245, 245, 245];
-  const bordeColor: [number, number, number] = [180, 180, 180];
-  const tituloColor: [number, number, number] = [40, 40, 80];
+  // ====== PIE DE PÁGINA (sutil) ======
+  const drawFooter = () => {
+    doc.setDrawColor(...B.border);
+    doc.setLineWidth(0.2);
+    doc.line(M.left, pageHeight - 12, pageWidth - M.right, pageHeight - 12);
 
-  const empresaLines = [
-    empresa.nombre,
-    empresa.direccion,
-    `CIF: ${empresa.CIF || "No especificado"}`,
-    empresa.telefono ? `Tel: ${empresa.telefono}` : "",
-    empresa.email ? `Email: ${empresa.email}` : "",
-  ].filter(Boolean);
+    doc.setFont(THEME.fonts.base, "normal");
+    doc.setFontSize(THEME.fonts.sizes.sm);
+    doc.setTextColor(...B.muted);
 
-  const clienteLines = [
-    cliente.nombre,
-    cliente.direccion,
-    cliente.telefono ? `Tel: ${cliente.telefono}` : "",
-    cliente.email ? `Email: ${cliente.email}` : "",
-  ].filter(Boolean);
+    const n = (doc as any).internal?.getNumberOfPages?.() || 1;
+    const p = (doc as any).internal?.getCurrentPageInfo?.()?.pageNumber || 1;
 
-  const empresaBoxX = leftX;
-  const clienteBoxX = leftX + tarjetaAncho + 10;
+    if (empresa?.nombre) doc.text(empresa.nombre, M.left, pageHeight - 6);
+
+    const contacto = [empresa?.telefono, empresa?.email]
+      .filter(Boolean)
+      .join(" • ");
+    if (contacto)
+      doc.text(contacto, pageWidth / 2, pageHeight - 6, { align: "center" });
+
+    doc.text(`Página ${p} de ${n}`, pageWidth - M.right, pageHeight - 6, {
+      align: "right",
+    });
+  };
+  drawFooter();
+
+  // ====== PORTADA ======
+  let y = 16;
+
+  y += 12;
+
+  // Tarjetas EMPRESA / CLIENTE
+  const cardW = (pageWidth - M.left - M.right - 10) / 2;
+  const cardH = 40;
 
   // Empresa
-  doc.setFillColor(...colorFondo);
-  doc.setDrawColor(...bordeColor);
-  doc.rect(empresaBoxX, bloqueY, tarjetaAncho, tarjetaAltura, "FD");
+  doc.setFillColor(...B.white);
+  doc.setDrawColor(...B.white);
+  doc.rect(M.left, y, cardW, cardH, "FD");
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...tituloColor);
-  doc.text("Datos de la Empresa", empresaBoxX + tarjetaPadding, bloqueY + 6);
+  doc.setFont(THEME.fonts.base, "bold");
+  doc.setTextColor(...B.primary);
+  doc.setFontSize(THEME.fonts.sizes.md);
+  doc.text("Empresa", M.left + 5, y + 7);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(0, 0, 0);
-  empresaLines.forEach((line, i) => {
-    doc.text(line, empresaBoxX + tarjetaPadding, bloqueY + 14 + i * 5);
-  });
+  doc.setFont(THEME.fonts.base, "normal");
+  doc.setTextColor(...B.text);
+  doc.setFontSize(THEME.fonts.sizes.sm);
+
+  const empresaLines = [
+    empresa?.nombre ? `Nombre: ${empresa.nombre}` : "",
+    empresa?.direccion ? `Dirección: ${empresa.direccion}` : "",
+    empresa?.CIF ? `CIF: ${empresa.CIF}` : "",
+    empresa?.telefono ? `Tel: ${empresa.telefono}` : "",
+    empresa?.email ? `Email: ${empresa.email}` : "",
+  ].filter(Boolean) as string[];
+  empresaLines.forEach((line, i) => doc.text(line, M.left + 5, y + 14 + i * 5));
 
   // Cliente
-  doc.setFillColor(...colorFondo);
-  doc.setDrawColor(...bordeColor);
-  doc.rect(clienteBoxX, bloqueY, tarjetaAncho, tarjetaAltura, "FD");
+  const cx = M.left + cardW + 10;
+  doc.setFillColor(...B.white);
+  doc.setDrawColor(...B.white);
+  doc.rect(cx, y, cardW, cardH, "FD");
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...tituloColor);
-  doc.text("Datos del Cliente", clienteBoxX + tarjetaPadding, bloqueY + 6);
+  doc.setFont(THEME.fonts.base, "bold");
+  doc.setTextColor(...B.primary);
+  doc.setFontSize(THEME.fonts.sizes.md);
+  doc.text("Cliente", cx + 5, y + 7);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(0, 0, 0);
-  clienteLines.forEach((line, i) => {
-    doc.text(line, clienteBoxX + tarjetaPadding, bloqueY + 14 + i * 5);
+  doc.setFont(THEME.fonts.base, "normal");
+  doc.setTextColor(...B.text);
+  doc.setFontSize(THEME.fonts.sizes.sm);
+
+  const clienteLines = [
+    cliente?.nombre ? `Nombre: ${cliente.nombre}` : "",
+    cliente?.direccion ? `Dirección: ${cliente.direccion}` : "",
+    cliente?.telefono ? `Tel: ${cliente.telefono}` : "",
+    cliente?.email ? `Email: ${cliente.email}` : "",
+  ].filter(Boolean) as string[];
+  clienteLines.forEach((line, i) => doc.text(line, cx + 5, y + 14 + i * 5));
+  y += cardH + 6;
+  // Título interno
+  doc.setTextColor(...B.primary);
+  doc.setFont(THEME.fonts.base, "bold");
+  doc.setFontSize(THEME.fonts.sizes.lg);
+  doc.text(nombrePresupuesto, M.left, y + 2);
+
+  // subrayado sutil
+  doc.setDrawColor(...B.border);
+  doc.setLineWidth(0.3);
+  doc.line(M.left, y + 6, pageWidth - M.right, y + 6);
+  // Fecha
+
+  doc.setFontSize(THEME.fonts.sizes.sm);
+  doc.setTextColor(...B.muted);
+  const fecha = new Date().toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+  doc.text(`Fecha de emisión: ${fecha}`, pageWidth - M.right, y, {
+    align: "right",
   });
 
-  // Fecha y número
-  const datosFinalY = bloqueY + tarjetaAltura + 8;
-  doc.setFontSize(10);
-  const fecha = new Date().toLocaleDateString("es-ES");
-  doc.text(`Fecha: ${fecha}`, leftX, datosFinalY);
-  doc.text(
-    `Presupuesto Nº: ${Math.floor(Math.random() * 100000)}`,
-    pageWidth - 70,
-    datosFinalY
-  );
+  y += 6;
 
-  const yEncabezado = datosFinalY + 10;
+  // ====== DESGLOSE (tabla disimulada + materiales) ======
   let subtotal = 0;
-  let y = yEncabezado;
 
   estructura.forEach((servicio, sIdx) => {
-    const bodyFilas: any[] = [];
+    const rows: RowInput[] = [];
 
     servicio.tareas.forEach((tarea, tIdx) => {
-      console.log("TAREA:", tarea.nombre, tarea.materiales);
-      const materiales =
-        tarea.materiales?.filter((m) => m.facturable === true) || [];
-      console.log("Materiales facturables:", materiales);
-      const tareaTotal = tarea.precioManoObra * tarea.cantidad;
-      // Fila principal de la tarea
-      bodyFilas.push([
-        `Partida ${sIdx + 1}.${tIdx + 1} - ${tarea.nombre ?? "Tarea sin nombre"}`,
-        tarea.descripcion ?? "Sin descripción",
-        `${tarea.cantidad} x `,
-        `${(tarea.precioManoObra ?? 0).toFixed(2)}`,
-        `${tareaTotal.toFixed(2)} €`,
+      const materiales = (tarea.materiales || []).filter((m) => m.facturable);
+      const cantidad = Number(tarea.cantidad || 0);
+      const pUd = Number(tarea.precioManoObra || 0);
+      const totalTarea = Number(tarea.total ?? cantidad * pUd);
+
+      // Tarea principal (nombre + desc opcional en la misma celda)
+      rows.push([
+        `${sIdx + 1}.${tIdx + 1}`,
+        `${tarea.nombre ?? "Tarea sin nombre"}${tarea.descripcion ? "\n" + tarea.descripcion : ""}`,
+        String(cantidad),
+        fmt(pUd),
+        fmt(totalTarea),
       ]);
 
-      // Filas de materiales
-      materiales
-        .filter((mat) => mat.facturable)
-        .forEach((mat, mIdx) => {
-          const totalMaterial = mat.cantidad * mat.precioUnidad;
-          bodyFilas.push([
-            `       Material ${sIdx + 1}.${tIdx + 1}.${mIdx + 1} `,
-            `- ${mat.nombre}`,
-            `${mat.cantidad} x `,
-            `${mat.precioUnidad.toFixed(2)}`,
-            `${totalMaterial.toFixed(2)} €`,
-          ]);
-        });
+      // Materiales (indentados + color tenue)
+      materiales.forEach((m, mIdx) => {
+        const totalMaterial =
+          Number(m.cantidad || 0) * Number(m.precioUnidad || 0);
+        rows.push([
+          `${sIdx + 1}.${tIdx + 1}.${mIdx + 1}`,
+          `   • ${m.nombre || "Material"}`,
+          String(m.cantidad || 0),
+          fmt(m.precioUnidad || 0),
+          fmt(totalMaterial),
+        ]);
+      });
 
-      subtotal += tarea.total ?? 0;
+      subtotal += totalTarea;
     });
 
-    // Tabla por servicio
-
     autoTable(doc, {
-      startY: (doc.lastAutoTable?.finalY ?? y) + 10,
+      startY: (doc as any).lastAutoTable?.finalY
+        ? (doc as any).lastAutoTable.finalY + 8
+        : y,
       head: [
         [
-          `Capítulo ${sIdx + 1} - ${servicio.servicioNombre}`,
-          "Descripción",
-          "Cantidad",
-          "€/ud",
+          "Partida",
+          servicio.servicioNombre || "Servicio",
+          "Cant.",
+          "Precio/ud",
           "Importe",
         ],
       ],
-      body: bodyFilas,
-      styles: { fontSize: 10 },
-
+      body: rows,
+      margin: { left: M.left, right: M.right },
+      theme: "plain", // sin rejilla
+      styles: {
+        font: THEME.fonts.base,
+        fontSize: THEME.fonts.sizes.sm,
+        textColor: B.text,
+        cellPadding: { top: 3.5, right: 4, bottom: 3.5, left: 4 },
+        lineWidth: 0, // nada de bordes automáticos
+        fillColor: [255, 255, 255],
+        minCellHeight: 6,
+        halign: "left",
+        valign: "middle",
+      },
       headStyles: {
-        fillColor: colorTabla, // color de fondo: azul brillante
-        textColor: 0, // 255 color del texto: blanco
-        fontStyle: "bold", // negrita
-        halign: "center", // alinear el texto centrado
-        fontSize: 10,
-        cellPadding: 3,
+        fontStyle: "bold",
+        textColor: B.text,
+        fillColor: [255, 255, 255],
       },
       columnStyles: {
-        0: { cellWidth: 50, fontStyle: "bold" },
-        1: {
-          cellWidth: 60,
-          halign: "left",
-          fontSize: 9,
-          overflow: "linebreak",
+        0: {
+          cellWidth: 20,
+          halign: "center",
+          fontStyle: "bold",
+          textColor: B.muted,
         },
-        2: { cellWidth: 25, halign: "right" },
-        3: { cellWidth: 30, halign: "center" },
-        4: {
-          cellWidth: 30,
-          halign: "right",
-          overflow: "ellipsize",
-          fillColor: [240, 240, 240],
-          textColor: [0, 0, 255],
-          fontStyle: "italic",
-        },
+        1: { cellWidth: 95, halign: "left" },
+        2: { cellWidth: 20, halign: "center", textColor: B.muted },
+        3: { cellWidth: 27, halign: "right", textColor: B.muted },
+        4: { cellWidth: 28, halign: "right", fontStyle: "bold" },
+      },
+      didParseCell: (data) => {
+        // Materiales en gris; descripción más pequeña
+        if (data.section === "body" && typeof data.cell.raw === "string") {
+          if (data.cell.raw.startsWith("   • ")) {
+            data.cell.styles.textColor = B.muted;
+          }
+          if (data.column.index === 1 && data.cell.raw.includes("\n")) {
+            data.cell.styles.fontSize = THEME.fonts.sizes.sm;
+          }
+        }
+      },
+      didDrawCell: (data) => {
+        // DIBUJAR SOLO LA LÍNEA INFERIOR DE CADA FILA (head y body) con chequeos seguros
+        const { cell, row, table } = data;
+        const isLastCell = data.column.index === table.columns.length - 1;
+        const yLine = cell.y + cell.height;
+        if (isLastCell) {
+          const isHeader = data.section === "head";
+          drawRowBottomLine(
+            doc,
+            row,
+            table,
+            yLine,
+            B.border,
+            isHeader ? 0.5 : 0.2
+          );
+        }
       },
     });
   });
 
-  // Totales
+  // ====== RESUMEN (solo líneas inferiores, TOTAL destacado) ======
   const descuentoCalculado =
     descuentoTipo === "porcentaje"
-      ? subtotal * (descuentoValor / 100)
-      : descuentoValor;
+      ? subtotal * (Number(descuentoValor || 0) / 100)
+      : Number(descuentoValor || 0);
 
-  const subtotalConDescuento = subtotal - descuentoCalculado;
-  const iva = subtotalConDescuento * (ivaPorcentaje / 100);
-  const total = subtotalConDescuento + iva;
+  const baseImponible = subtotal - descuentoCalculado;
+  const iva = baseImponible * (Number(ivaPorcentaje || 0) / 100);
+  const total = baseImponible + iva;
 
-  const resumenBody = [["Subtotal", `${subtotal.toFixed(2)} €`]];
-
-  if (descuentoCalculado !== 0) {
-    resumenBody.push([
+  const resumenRows: RowInput[] = [["Subtotal", fmt(subtotal)]];
+  if (Math.abs(descuentoCalculado) > 0.0001) {
+    resumenRows.push([
       descuentoTipo === "porcentaje"
         ? `Descuento (${descuentoValor}%)`
         : "Descuento",
-      `- ${descuentoCalculado.toFixed(2)} €`,
+      `- ${fmt(descuentoCalculado)}`,
     ]);
   }
+  resumenRows.push([`IVA (${ivaPorcentaje}%)`, fmt(iva)]);
 
-  resumenBody.push(
-    [`IVA (${ivaPorcentaje}%)`, `${iva.toFixed(2)} €`],
-    ["Total con IVA", `${total.toFixed(2)} €`]
-  );
+  let resumenStartY = (doc as any).lastAutoTable?.finalY
+    ? (doc as any).lastAutoTable.finalY + 10
+    : y + 10;
 
-  let resumenStartY = (doc.lastAutoTable?.finalY ?? y) + 20;
-  const alturaMinimaResumen = 30;
-  const pageHeight = doc.internal.pageSize.getHeight();
-
-  if (pageHeight - resumenStartY < alturaMinimaResumen) {
+  if (pageHeight - resumenStartY < 50) {
     doc.addPage();
-    resumenStartY = 20; // ¡Muy importante! Empezamos arriba en la nueva página
+    drawFooter();
+    resumenStartY = 16;
   }
 
+  // Lista resumen “plain” con línea inferior por fila
   autoTable(doc, {
     startY: resumenStartY,
-    tableWidth: 60,
-    margin: { left: pageWidth - 14 - 70 },
-    head: [["Resumen", "Importe"]],
-    body: resumenBody,
+    body: resumenRows,
+    margin: { left: pageWidth - M.right - 70, right: M.right },
+    theme: "plain",
     styles: {
-      fontSize: 10,
+      font: THEME.fonts.base,
+      fontSize: THEME.fonts.sizes.base,
+      textColor: B.text,
+      cellPadding: { top: 2, right: 0, bottom: 2, left: 0 },
+      lineWidth: 0, // sin rejilla
       halign: "right",
     },
-    headStyles: {
-      fillColor: colorTabla,
-      textColor: 0,
-      fontStyle: "bold",
+    columnStyles: {
+      0: { halign: "left", fontStyle: "bold" },
+      1: { halign: "right" },
+    },
+    didDrawCell: (data) => {
+      if (data.section !== "body") return;
+      const { cell, row, table } = data;
+      const yLine = cell.y + cell.height;
+      drawRowBottomLine(doc, row, table, yLine, B.border, 0.2);
     },
   });
 
-  const firmaStartY = (doc.lastAutoTable?.finalY ?? resumenStartY) + 20;
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
+  // TOTAL destacado (limpio)
+  const totalY = (doc as any).lastAutoTable?.finalY
+    ? (doc as any).lastAutoTable.finalY + 4
+    : resumenStartY + 4;
 
-  const firmaEmpresaY = firmaStartY;
-  doc.text("Conforme Empresa:", pageWidth / 2 + 10, firmaEmpresaY);
-  doc.line(
-    pageWidth / 2 + 10,
-    firmaEmpresaY + 5,
-    pageWidth - 25,
-    firmaEmpresaY + 5
-  ); // Línea
-  if (firmaBase64) {
-    doc.addImage(firmaBase64, "PNG", pageWidth - 60, firmaEmpresaY - 5, 30, 12);
+  const resumenW = 70;
+  const resumenX = pageWidth - M.right - resumenW;
+
+  // separador superior
+  doc.setDrawColor(...B.border);
+  doc.setLineWidth(0.5);
+  doc.line(resumenX, totalY, resumenX + resumenW, totalY);
+
+  doc.setFont(THEME.fonts.base, "bold");
+  doc.setFontSize(THEME.fonts.sizes.lg);
+  doc.setTextColor(...B.primary);
+  doc.text("TOTAL", resumenX, totalY + 8);
+  doc.text(fmt(total), resumenX + resumenW, totalY + 8, { align: "right" });
+
+  // Variable para la posición Y después de condiciones
+  let finalY = totalY + 20;
+
+  // ====== CONDICIONES (plain, multipágina) ======
+  if (condiciones && condiciones.trim()) {
+    doc.addPage();
+    drawFooter();
+
+    // Título de condiciones
+    doc.setTextColor(...B.text);
+    doc.setFont(THEME.fonts.base, "bold");
+    doc.setFontSize(THEME.fonts.sizes.lg);
+    doc.text("Condiciones Generales", M.left, 18);
+
+    // Línea decorativa bajo el título
+    doc.setDrawColor(...B.border);
+    doc.setLineWidth(0.3);
+    doc.line(M.left, 21, pageWidth - M.right, 21);
+
+    doc.setFont(THEME.fonts.base, "normal");
+    doc.setFontSize(THEME.fonts.sizes.base);
+
+    const maxWidth = pageWidth - M.left - M.right;
+
+    // Procesamiento mejorado para listas HTML
+    let text = condiciones
+      .replace(/<ul>/g, "\n")
+      .replace(/<\/ul>/g, "\n")
+      .replace(/<li><p>/g, "• ") // <li><p> a viñeta
+      .replace(/<\/p><p><\/p><\/li>/g, "\n") // Cierre con párrafo vacío
+      .replace(/<\/p><\/li>/g, "\n") // Cierre normal
+      .replace(/<p><\/p>/g, "\n") // Párrafos vacíos restantes
+      .replace(/<[^>]*>/g, "\n") // Resto de HTML
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/\s+/g, " ") // Múltiples espacios a uno
+      .replace(/\n\s*\n/g, "\n") // Múltiples saltos a uno
+      .trim();
+
+    const items = text.split("\n").filter((item) => item.trim() !== "");
+
+    let ty = 30;
+    const lh = 5.5; // Altura de línea
+    const itemSpacing = 8; // Espacio entre elementos
+
+    items.forEach((item, index) => {
+      if (ty > pageHeight - M.bottom - 40) {
+        doc.addPage();
+        drawFooter();
+        ty = 20;
+      }
+
+      // Configurar para elementos de lista
+      if (item.startsWith("•")) {
+        // Elemento de lista normal
+        doc.setTextColor(...B.text);
+        doc.setFont(THEME.fonts.base, "normal");
+      } else if (item.includes("NUMERO DE CUENTA")) {
+        // Destacar información importante
+        doc.setTextColor(...B.primary);
+        doc.setFont(THEME.fonts.base, "bold");
+      }
+
+      // Dividir en líneas
+      const lines = doc.splitTextToSize(item, maxWidth - 6);
+
+      lines.forEach((line: string, lineIndex: number) => {
+        if (ty > pageHeight - M.bottom - 40) {
+          doc.addPage();
+          drawFooter();
+          ty = 20;
+        }
+
+        // Indentación para líneas de continuación
+        const xPos = lineIndex === 0 ? M.left : M.left + 8;
+        doc.text(line, xPos, ty);
+        ty += lh;
+      });
+
+      // Espacio entre elementos (excepto el último)
+      if (index < items.length - 1) {
+        ty += itemSpacing - lh;
+      }
+    });
+
+    // Actualizar finalY
+    finalY = ty + 15;
   }
-  doc.text(`Fecha: ${fecha}`, pageWidth / 2 + 10, firmaEmpresaY + 12); // Debajo de la línea
+  // ====== FIRMAS ======
+  // Verificar si hay espacio suficiente para las firmas
+  if (pageHeight - finalY < 45) {
+    doc.addPage();
+    drawFooter();
+    finalY = 20;
+  }
 
-  // === Firma Cliente ===
-  const firmaClienteY = firmaEmpresaY + 25;
-  doc.text("Conforme Cliente:", pageWidth / 2 + 10, firmaClienteY);
-  doc.line(
-    pageWidth / 2 + 10,
-    firmaClienteY + 5,
-    pageWidth - 25,
-    firmaClienteY + 5
-  ); // Línea
-  doc.text("Fecha:", pageWidth / 2 + 10, firmaClienteY + 12); // Debajo de la línea
+  const firmaW = (pageWidth - M.left - M.right - 10) / 2;
+  const firmaA_X = M.left;
+  const firmaB_X = M.left + firmaW + 10;
 
-  // Crear div oculto con condiciones
-  const div = document.createElement("div");
-  div.style.position = "fixed";
-  div.style.top = "0px";
-  div.style.left = "0px";
-  div.style.width = "90mm";
-  div.style.maxHeight = "height";
-  div.style.padding = "4px";
-  div.style.fontSize = "10px";
-  div.style.lineHeight = "1.2";
-  div.style.backgroundColor = "#fff";
-  div.style.fontFamily = "Helvetica, Arial, sans-serif";
-  div.style.zIndex = "9999";
-  div.style.visibility = "hidden"; // esto evita que se vea, pero html2canvas lo captura
+  // Título de firmas (opcional)
+  doc.setFont(THEME.fonts.base, "bold");
+  doc.setTextColor(...B.primary);
+  doc.setFontSize(THEME.fonts.sizes.md);
+  doc.text("CONFORMIDAD", pageWidth / 2, finalY, { align: "center" });
 
-  div.innerHTML = `
-  <div>
-    ${condiciones}
-  </div>
-`;
-  //
-  console.log("Condiciones:", condiciones);
-  document.body.appendChild(div);
-  div.style.visibility = "visible"; // Para debug visual
+  // Línea decorativa
+  doc.setDrawColor(...B.border);
+  doc.setLineWidth(0.3);
+  doc.line(M.left, finalY + 3, pageWidth - M.right, finalY + 3);
 
-  // 🖼️ Renderizar como imagen
-  const canvas = await html2canvas(div, {
-    scale: 2,
-    useCORS: false,
-  });
+  finalY += 15;
 
-  const imgData = canvas.toDataURL("image/png");
+  // Firmas
+  doc.setFont(THEME.fonts.base, "normal");
+  doc.setTextColor(...B.text);
+  doc.setFontSize(THEME.fonts.sizes.base);
+  doc.text("", firmaA_X, finalY);
 
-  //doc.addImage(imgData, 'PNG', 25, resumenStartY, 100, 0);
+  doc.setDrawColor(...B.border);
+  doc.setLineWidth(0.3);
+  doc.line(firmaA_X, finalY + 10, firmaA_X + firmaW - 10, finalY + 10);
 
-  // ➕ Añadir nueva página
+  if (firmaBase64) {
+    doc.addImage(firmaBase64, "PNG", firmaA_X + 8, finalY - 8, 40, 12);
+  }
+  doc.setFontSize(THEME.fonts.sizes.xs);
+  doc.setTextColor(...B.muted);
+  doc.text(`Fecha: ${fecha}`, firmaA_X, finalY + 16);
 
-  // 📌 Añadir imagen (ajusta tamaño si quieres)
-  doc.addImage(imgData, "PNG", 20, resumenStartY, 80, 0);
+  doc.setFontSize(THEME.fonts.sizes.base);
+  doc.setTextColor(...B.text);
+  doc.text("", firmaB_X, finalY);
+  doc.setDrawColor(...B.border);
+  doc.line(firmaB_X, finalY + 10, firmaB_X + firmaW - 10, finalY + 10);
 
-  // 🧹 Eliminar div temporal
-  document.body.removeChild(div);
+  doc.setFontSize(THEME.fonts.sizes.xs);
+  doc.setTextColor(...B.muted);
+  doc.text("Fecha: ___________", firmaB_X, finalY + 16);
 
-  // 💾 Guardar PDF
-  doc.save("presupuesto.pdf");
+  // Información adicional de firmas
+  doc.setFontSize(THEME.fonts.sizes.xs);
+  doc.setTextColor(...B.muted);
+  doc.text(empresa.nombre || "Empresa", firmaA_X, finalY + 22);
+  doc.text(cliente.nombre || "Cliente", firmaB_X, finalY + 22);
+
+  // Guardar
+  doc.save(`Presupuesto-${numeroPresupuesto}.pdf`);
 }
